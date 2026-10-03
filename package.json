@@ -1,0 +1,37 @@
+{
+  "name": "rdgen-automator",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "env:generate": "node scripts/generate-env.mjs",
+    "dev:web": "pnpm --filter @rdgen/web dev",
+    "dev:api": "pnpm --filter @rdgen/api dev",
+    "dev:worker": "pnpm --filter @rdgen/worker dev",
+    "db:migrate": "pnpm --filter @rdgen/api db:migrate",
+    "db:seed": "pnpm --filter @rdgen/api db:seed",
+    "encryption:rotate": "pnpm --filter @rdgen/api encryption:rotate",
+    "dev:smoke": "tsx scripts/dev-smoke.ts",
+    "test:encryption": "tsx --test packages/domain/src/encryption.test.ts apps/api/src/database/client.test.ts",
+    "test:authorization": "node --import tsx --test apps/api/src/resources/authorization.test.ts",
+    "test:sessions": "node --import tsx --test apps/api/src/auth/session.test.ts",
+    "test:requests": "node --import tsx --test apps/api/src/requests/requests.test.ts",
+    "test:presets": "node --import tsx --test packages/domain/src/configuration.test.ts",
+    "api:smoke-auth": "node --import tsx scripts/api-smoke-auth.ts",
+    "api:smoke-request": "node --import tsx scripts/api-smoke-request.ts",
+    "test:worker": "node --import tsx --test apps/worker/src/lifecycle.test.ts",
+    "test:rdgen-provider": "node --import tsx --test packages/domain/src/rdgen-provider.test.ts",
+    "test:state-machine": "node --import tsx --test packages/domain/src/lifecycle.test.ts",
+    "worker:smoke-rdgen-fixture": "TSX_TSCONFIG_PATH=apps/api/tsconfig.json node --import tsx scripts/worker-smoke-rdgen-fixture.ts",
+    "test:artifacts": "node --import tsx --test packages/domain/src/artifacts.test.ts",
+    "test:retention": "TSX_TSCONFIG_PATH=apps/api/tsconfig.json node --import tsx scripts/retention-smoke.ts",
+    "worker:smoke-artifacts": "TSX_TSCONFIG_PATH=apps/api/tsconfig.json node --import tsx scripts/worker-smoke-rdgen-fixture.ts",
+    "test:web": "pnpm --filter @rdgen/web test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2"
+  }
+}

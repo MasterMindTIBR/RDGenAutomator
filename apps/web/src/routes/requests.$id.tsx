@@ -1,0 +1,3 @@
+import { createFileRoute } from '@tanstack/react-router';
+import { RequestDetail } from '@/components/rdgen/detail';
+export const Route=createFileRoute('/requests/$id')({head:()=>({meta:[{title:'Detalhe da solicitação — RDGen Automator'},{name:'description',content:'Acompanhe jobs, tentativas e artefatos de uma solicitação RustDesk.'},{property:'og:title',content:'Detalhe da solicitação — RDGen Automator'},{property:'og:description',content:'Acompanhe jobs, tentativas e artefatos de uma solicitação RustDesk.'},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]}),component:RequestDetail});

@@ -1,0 +1,17 @@
+{
+  "name": "@rdgen/domain",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "16.4.7",
+    "zod": "3.24.1"
+  }
+}

@@ -1,0 +1,19 @@
+# Secrets and repository metadata
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+
+# Local/generated dependencies and data
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+storage
+coverage
+test-results
+*.tsbuildinfo
+*.log

@@ -1,0 +1,9 @@
+node_modules/
+.next/
+dist/
+.env
+*.log
+storage/
+coverage/
+*.tsbuildinfo
+test-results/

@@ -1,0 +1,26 @@
+import type { Artifact, Branding, BrandingImages, BuildRequest, Job, Preset, Server, User } from './types';
+
+const root = '/api/backend';
+function csrfToken() { return typeof document === 'undefined' ? undefined : document.cookie.split('; ').find((part) => part.startsWith('rdgen_csrf='))?.split('=').slice(1).join('='); }
+export class ApiError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+export async function api<T>(path: string, init: RequestInit & { idempotencyKey?: string } = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(init.method ?? 'GET')) { const csrf = csrfToken(); if (csrf) headers.set('x-csrf-token', decodeURIComponent(csrf)); }
+  if (init.idempotencyKey) headers.set('idempotency-key', init.idempotencyKey);
+  const response = await fetch(`${root}${path}`, { ...init, headers, credentials: 'same-origin' });
+  if (!response.ok) { const payload = await response.json().catch(() => undefined) as { message?: string | string[] } | undefined; throw new ApiError(response.status, Array.isArray(payload?.message) ? payload.message.join(' ') : payload?.message ?? `Erro HTTP ${response.status}`); }
+  return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+}
+export const backend = {
+  me: () => api<{ user: User }>('/me'), login: (email: string, password: string) => api<{ user: User; csrfToken: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }), logout: () => api('/auth/logout', { method: 'POST' }),
+  requests: () => api<{ requests: BuildRequest[] }>('/build-requests'), request: (id: string) => api<{ request: BuildRequest; jobs: Job[]; artifacts: Artifact[] }>(`/build-requests/${id}`),
+  options: () => api<{ servers: Pick<Server, 'id' | 'name'>[]; presets: Pick<Preset, 'id' | 'name' | 'profile' | 'version'>[]; brandings: Pick<Branding, 'id' | 'name' | 'companyName' | 'theme'>[]; releases: string[] }>('/build-requests/options'),
+  refreshReleases: () => api<{ releases: string[]; checkedAt: string }>('/build-requests/releases/refresh', { method: 'POST' }), createRequest: (body: unknown, idempotencyKey: string) => api<{ request: BuildRequest; jobs: Job[] }>('/build-requests', { method: 'POST', body: JSON.stringify(body), idempotencyKey }), visibility: (id: string, visibility: 'private' | 'published') => api(`/build-requests/${id}/visibility`, { method: 'POST', body: JSON.stringify({ visibility }) }),
+  users: () => api<{ users: User[] }>('/admin/users'), createUser: (body: unknown) => api('/admin/users', { method: 'POST', body: JSON.stringify(body) }), disableUser: (id: string) => api(`/admin/users/${id}/disable`, { method: 'POST' }),
+  servers: () => api<{ servers: Server[] }>('/admin/rustdesk-servers'), saveServer: (server: Server) => api(server.id ? `/admin/rustdesk-servers/${server.id}` : '/admin/rustdesk-servers', { method: server.id ? 'PUT' : 'POST', body: JSON.stringify({ name: server.name, configuration: server.configuration }) }), deleteServer: (id: string) => api(`/admin/rustdesk-servers/${id}`, { method: 'DELETE' }),
+  presets: () => api<{ presets: Preset[] }>('/admin/presets'), savePreset: (preset: Preset) => api(preset.id ? `/admin/presets/${preset.id}` : '/admin/presets', { method: preset.id ? 'PUT' : 'POST', body: JSON.stringify({ name: preset.name, profile: preset.profile, version: preset.version, configuration: preset.configuration }) }), deletePreset: (id: string) => api(`/admin/presets/${id}`, { method: 'DELETE' }),
+  brandings: () => api<{ brandings: Branding[] }>('/admin/brandings'), saveBranding: (branding: Branding, images: BrandingImages) => { const { id, createdAt, updatedAt, ...body } = branding; return api(id ? `/admin/brandings/${id}` : '/admin/brandings', { method: id ? 'PUT' : 'POST', body: JSON.stringify({ ...body, ...images }) }); }, deleteBranding: (id: string) => api(`/admin/brandings/${id}`, { method: 'DELETE' }),
+  settings: () => api<{ settings: { artifactRetentionDays: number; logoRetentionDays: number; updatedAt?: string } }>('/admin/settings'), saveSettings: (artifactRetentionDays: number, logoRetentionDays: number) => api('/admin/settings', { method: 'PUT', body: JSON.stringify({ artifactRetentionDays, logoRetentionDays }) }), health: () => api<{ status: 'ready' | 'degraded'; dependencies: Record<string, { ready: boolean }> }>('/health'),
+  job: (id: string, action: 'cancel' | 'retry' | 'reconcile', body: unknown = {}) => api(`/build-jobs/${id}/${action}`, { method: 'POST', body: JSON.stringify(body) }), externalLinks: (id: string) => api<{ links: { statusUrl?: string; actionUrl?: string } }>(`/build-jobs/${id}/external-links`),
+};

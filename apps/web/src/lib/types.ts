@@ -1,0 +1,28 @@
+export type Role = 'administrator' | 'user';
+export type Profile = 'full' | 'qs';
+export type Platform = 'windows' | 'windows-x86' | 'linux' | 'android' | 'macos';
+export type JobStatus = 'rascunho' | 'enfileirado' | 'iniciando' | 'início_indeterminado' | 'aguardando_rdgen' | 'aguardando_retry' | 'baixando' | 'validando' | 'concluído' | 'concluído_parcial' | 'falhou' | 'cancelado';
+export type User = { id: string; email: string; role: Role; status?: 'active' | 'disabled'; lastLoginAt: string; createdAt?: string; updatedAt?: string };
+export type ImageInput = { contentType: 'image/png'; dataBase64: string };
+export type Images = Partial<Record<'icon' | 'logo' | 'privacy', string>>;
+export type BrandingImages = Partial<Record<'icon' | 'logo' | 'privacyScreen', ImageInput>>;
+export type ServerConfiguration = { host: string; port?: string | number; publicKey: string; apiServer?: string; linkUrl?: string; downloadUrl?: string };
+export type Server = { id: string; name: string; configuration: ServerConfiguration; createdAt?: string; updatedAt?: string };
+export type Permission = 'keyboard' | 'clipboard' | 'fileTransfer' | 'audio' | 'tunnel' | 'remoteRestart' | 'recording' | 'blockInput' | 'remoteConfigModification' | 'printer' | 'camera' | 'terminal';
+export type PresetConfig = { direction: string; installationEnabled: boolean; settingsEnabled: boolean; approvalMode: string; denyLanDiscovery: boolean; enableDirectIp: boolean; autoDisconnect: boolean; hideConnectionManager: boolean; removeWallpaper: boolean; offlineMode: boolean; suppressNewVersionNotification: boolean; permissions: Record<Permission, boolean> };
+export type Preset = { id: string; name: string; profile: Profile; version: number; configuration: PresetConfig; createdAt?: string; updatedAt?: string };
+export type Branding = { id: string; name: string; companyName: string; androidApplicationId?: string; theme: 'light' | 'dark' | 'system'; themeScope: 'default' | 'override'; createdAt?: string; updatedAt?: string };
+export type BuildRequest = { id: string; displayName: string; technicalName: string; visibility: 'private' | 'published'; createdAt: string; updatedAt: string; canManage?: boolean; creatorId?: string; serverId?: string; profiles?: Profile[] };
+export type Attempt = { id: string; number: number; status: JobStatus; stage?: string | null; errorCode?: string | null; riskConfirmedAt?: string | null; createdAt: string; updatedAt: string };
+export type Job = { id: string; profile: Profile; platform: Platform; version: string; status: JobStatus; manualRetryAfter?: string | null; lastErrorCode?: string | null; cancellationRemoteMayContinue?: boolean; createdAt: string; updatedAt: string; attempts: Attempt[]; requestId?: string };
+export type Artifact = { id: string; sha256: string; bytes: number; contentType: string; createdAt: string };
+
+export const platforms: Platform[] = ['windows', 'windows-x86', 'linux', 'android', 'macos'];
+export const platformLabel: Record<Platform, string> = { windows: 'Windows', 'windows-x86': 'Windows x86', linux: 'Linux', android: 'Android', macos: 'macOS' };
+export const statuses: JobStatus[] = ['rascunho', 'enfileirado', 'iniciando', 'início_indeterminado', 'aguardando_rdgen', 'aguardando_retry', 'baixando', 'validando', 'concluído', 'concluído_parcial', 'falhou', 'cancelado'];
+export const statusLabel: Record<JobStatus, string> = { rascunho: 'Rascunho', enfileirado: 'Enfileirado', iniciando: 'Iniciando', início_indeterminado: 'Início indeterminado', aguardando_rdgen: 'Aguardando RDGen', aguardando_retry: 'Aguardando retry', baixando: 'Baixando', validando: 'Validando', concluído: 'Concluído', concluído_parcial: 'Concluído parcial', falhou: 'Falhou', cancelado: 'Cancelado' };
+export const permissions: Permission[] = ['keyboard', 'clipboard', 'fileTransfer', 'audio', 'tunnel', 'remoteRestart', 'recording', 'blockInput', 'remoteConfigModification', 'printer', 'camera', 'terminal'];
+export const permissionLabel: Record<Permission, string> = { keyboard: 'Teclado', clipboard: 'Área de transferência', fileTransfer: 'Transferência de arquivo', audio: 'Áudio', tunnel: 'Túnel', remoteRestart: 'Reinício remoto', recording: 'Gravação', blockInput: 'Bloqueio de entrada', remoteConfigModification: 'Modificação remota de config', printer: 'Impressora', camera: 'Câmera', terminal: 'Terminal' };
+export function defaultConfig(_profile: Profile): PresetConfig { return { direction: 'Ambas', installationEnabled: _profile === 'full', settingsEnabled: true, approvalMode: 'Senha permanente', denyLanDiscovery: false, enableDirectIp: false, autoDisconnect: false, hideConnectionManager: false, removeWallpaper: false, offlineMode: false, suppressNewVersionNotification: false, permissions: Object.fromEntries(permissions.map((permission) => [permission, true])) as Record<Permission, boolean> }; }
+export function imageDataUrl(image: ImageInput | undefined): string | undefined { return image ? `data:${image.contentType};base64,${image.dataBase64}` : undefined; }
+export function dataUrlToImage(value: string | undefined): ImageInput | undefined { if (!value) return undefined; const match = value.match(/^data:image\/png;base64,(.+)$/); return match ? { contentType: 'image/png', dataBase64: match[1]! } : undefined; }

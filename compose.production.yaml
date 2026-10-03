@@ -1,0 +1,121 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rdgen_automator}
+      POSTGRES_USER: ${POSTGRES_USER:-rdgen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the production environment}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - redis-data:/data
+
+  migrate:
+    build:
+      context: .
+      target: api
+    restart: "no"
+    command: ["pnpm", "--filter", "@rdgen/api", "db:migrate"]
+    environment: &application-environment
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rdgen}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the production environment}@postgres:5432/${POSTGRES_DB:-rdgen_automator}
+      REDIS_URL: redis://redis:6379
+      APP_STORAGE_PATH: /var/lib/rdgen/storage
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Set APP_ENCRYPTION_KEY in the production environment}
+      APP_ENCRYPTION_KEY_ID: ${APP_ENCRYPTION_KEY_ID:?Set APP_ENCRYPTION_KEY_ID in the production environment}
+      API_PORT: "3001"
+      WEB_PORT: "3000"
+      WORKER_PORT: "3002"
+      APP_BIND_HOST: 0.0.0.0
+      API_BASE_URL: ${APP_PUBLIC_URL:?Set APP_PUBLIC_URL to the external HTTPS URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    environment: *application-environment
+    expose:
+      - "3001"
+    volumes:
+      - protected-storage:/var/lib/rdgen/storage
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    environment: *application-environment
+    expose:
+      - "3002"
+    volumes:
+      - protected-storage:/var/lib/rdgen/storage
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      WEB_PORT: "3000"
+      APP_BIND_HOST: 0.0.0.0
+      API_BASE_URL: http://api:3001
+    ports:
+      - "${WEB_HOST_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  protected-storage:

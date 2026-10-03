@@ -1,0 +1,5 @@
+- [x] Estruturar dados e operações locais em memória
+- [x] Montar navegação, login e dashboard
+- [x] Implementar criação e detalhe das solicitações
+- [x] Implementar as seis telas administrativas
+- [x] Verificar fluxos e apresentação
