@@ -54,6 +54,34 @@ export class JobsService {
       await client.query('COMMIT'); return { reconciled: true };
     } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
   }
+  async bulkAction(actor: Actor, requestId: string, action: 'retry' | 'reconcile', scope: 'all' | 'failed'): Promise<{ acted: number }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const request = await client.query<{ creatorId: string }>(`SELECT creator_id AS "creatorId" FROM build_requests WHERE id = $1 FOR UPDATE`, [requestId]);
+      if (request.rowCount !== 1) throw new NotFoundException('Request not found.');
+      if (actor.role !== 'administrator' && request.rows[0].creatorId !== actor.userId) throw new ForbiddenException('You cannot act on this request.');
+      const statusFilter = scope === 'failed' ? ` AND j.status IN ('início_indeterminado', 'falhou')` : '';
+      const jobs = await client.query<{ id: string; status: string }>(`SELECT j.id, j.status FROM build_jobs j WHERE j.request_id = $1${statusFilter} FOR UPDATE OF j`, [requestId]);
+      let acted = 0;
+      for (const job of jobs.rows) {
+        if (action === 'retry') {
+          if (!['início_indeterminado', 'falhou'].includes(job.status)) continue;
+          await client.query(`UPDATE build_attempts SET risk_confirmed_at = now() WHERE job_id = $1 AND status = 'início_indeterminado' AND risk_confirmed_at IS NULL`, [job.id]);
+          await client.query(`UPDATE build_jobs SET status = 'aguardando_retry', manual_retry_after = now(), next_retry_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1`, [job.id]);
+          await this.outbox(client, job.id, 'bulk-retry');
+          acted += 1;
+        } else {
+          if (job.status !== 'início_indeterminado') continue;
+          await client.query(`UPDATE build_attempts SET active = false, status = 'falhou', error_code = 'reconciled_dead', ended_at = now() WHERE job_id = $1 AND status = 'início_indeterminado'`, [job.id]);
+          await client.query(`UPDATE build_jobs SET status = 'falhou', lease_owner = NULL, lease_expires_at = NULL, last_error_code = 'reconciled_dead', updated_at = now() WHERE id = $1`, [job.id]);
+          acted += 1;
+        }
+      }
+      await new AuditService(client).record(actor.userId, 'build_job.bulk_action', 'build_request', requestId, { action, scope, count: acted });
+      await client.query('COMMIT'); return { acted };
+    } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
+  }
   /**
    * External capability links are decrypted only after the ownership check. They
    * are intentionally separate from ordinary job detail responses so polling

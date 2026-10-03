@@ -13,6 +13,7 @@ const environment = {
   WEB_PORT: 3000,
   WORKER_PORT: 3002,
   APP_BIND_HOST: '127.0.0.1',
+  RDGEN_START_DELAY_SECONDS: 5,
   API_BASE_URL: 'https://localhost:3001'
 };
 
