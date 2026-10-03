@@ -24,4 +24,14 @@ describe('same-origin backend proxy', () => {
     expect(fetchStub.mock.calls[0]?.[0]).toBeInstanceOf(Request);
     vi.unstubAllGlobals();
   });
+
+  it('forwards a body-less POST (e.g. logout) without disturbing the request stream', async () => {
+    const fetchStub = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchStub);
+    const response = await forwardBackendRequest(new Request('http://web.test/api/backend/auth/logout', { method: 'POST', headers: { cookie: 'rdgen_session=s', 'x-csrf-token': 'csrf' } }), '/auth/logout', 'http://api.test:3001');
+    expect(response.status).toBe(204);
+    const forwarded = fetchStub.mock.calls[0]?.[0] as Request;
+    expect(forwarded.method).toBe('POST');
+    vi.unstubAllGlobals();
+  });
 });
