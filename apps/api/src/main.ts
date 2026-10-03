@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, NestApplication } from '@nestjs/core';
 import { EncryptionService, ensureProtectedStorage, loadEnvironment } from '@rdgen/domain';
 import { Redis } from 'ioredis';
 import pg from 'pg';
@@ -21,7 +21,8 @@ async function bootstrap(): Promise<void> {
     await pool.end().catch(() => undefined);
     throw error;
   }
-  const app = await NestFactory.create(createAppModule(environment, pool, redis, encryption), { logger: ['log', 'warn', 'error'] });
+  const app = await NestFactory.create<NestApplication>(createAppModule(environment, pool, redis, encryption), { logger: ['log', 'warn', 'error'] });
+  app.useBodyParser('json', { limit: '10mb' });
   app.enableShutdownHooks();
   const closeDependencies = async () => { await redis.quit(); await pool.end(); };
   app.getHttpAdapter().getInstance().once('close', () => { void closeDependencies(); });
