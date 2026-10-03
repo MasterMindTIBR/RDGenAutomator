@@ -55,7 +55,8 @@ export class RdgenJobRunner {
   private readonly owner = `worker-${randomUUID()}`;
   private readonly artifacts?: ArtifactDelivery;
   private readonly storagePath?: string;
-  constructor(private readonly pool: Pool, private readonly queue: Queue, private readonly encryption: EncryptionService, private readonly provider: RdgenProvider, private readonly pollDelayMs = 15_000, storagePath?: string) {
+  private lastStartAt = 0;
+  constructor(private readonly pool: Pool, private readonly queue: Queue, private readonly encryption: EncryptionService, private readonly provider: RdgenProvider, private readonly pollDelayMs = 15_000, private readonly startGapMs = 5_000, storagePath?: string) {
     this.storagePath = storagePath; if (storagePath) this.artifacts = new ArtifactDelivery(pool, encryption, storagePath, provider);
   }
   async run(jobId: string): Promise<void> {
@@ -101,8 +102,13 @@ export class RdgenJobRunner {
       await client.query('COMMIT'); return { kind: 'start', jobId, attemptId: attempt.rows[0].id, attemptNumber: number.rows[0].value, configuration };
     } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
   }
+  private async throttleStart(): Promise<void> {
+    const elapsed = Date.now() - this.lastStartAt;
+    if (elapsed < this.startGapMs) { const { promise, resolve } = Promise.withResolvers<void>(); setTimeout(resolve, this.startGapMs - elapsed); await promise; }
+    this.lastStartAt = Date.now();
+  }
   private async start(claim: ClaimedStart): Promise<void> {
-    try { await this.persistRemote(claim, await this.provider.startBuild(claim.configuration)); }
+    try { await this.throttleStart(); await this.persistRemote(claim, await this.provider.startBuild(claim.configuration)); }
     catch (error) {
       if (error instanceof RdgenAmbiguousStartError) return this.indeterminate(claim, error);
       if (error instanceof RdgenTransientError) return this.transient(claim, error, false);

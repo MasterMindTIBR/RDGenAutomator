@@ -20,7 +20,7 @@ async function bootstrap(): Promise<void> {
   encryption.verifySentinel(sentinel.rows[0]);
   const queue = new Queue('rdgen-builds', { connection });
   const dispatcher = new OutboxDispatcher(pool, queue);
-  const runner = new RdgenJobRunner(pool, queue, encryption, new RdgenProvider(), 15_000, environment.APP_STORAGE_PATH);
+  const runner = new RdgenJobRunner(pool, queue, encryption, new RdgenProvider(), 15_000, environment.RDGEN_START_DELAY_SECONDS * 1000, environment.APP_STORAGE_PATH);
   const retention = new RetentionService(pool, environment.APP_STORAGE_PATH);
   const worker = new Worker('rdgen-builds', async (job) => runner.run(String(job.data.jobId)), { connection, concurrency: 1 });
   await Promise.all([queue.waitUntilReady(), worker.waitUntilReady()]);

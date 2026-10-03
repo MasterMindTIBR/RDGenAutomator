@@ -33,6 +33,7 @@ const environmentSchema = z.object({
   WEB_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   WORKER_PORT: z.coerce.number().int().min(1).max(65535).default(3002),
   APP_BIND_HOST: z.string().trim().min(1).max(253).regex(/^[A-Za-z0-9._:-]+$/, 'must be a valid host or IP address').default('127.0.0.1'),
+  RDGEN_START_DELAY_SECONDS: z.coerce.number().int().min(0).max(3600).default(5),
   API_BASE_URL: z.string().url().default('http://localhost:3001')
 });
 
