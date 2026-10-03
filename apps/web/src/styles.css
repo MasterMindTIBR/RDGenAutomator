@@ -224,6 +224,6 @@ input:not([type=checkbox]):not([type=file]),select,textarea {background:var(--pa
 .swal-cancel{background:transparent;color:var(--muted-foreground);border-color:var(--border)!important}
 .swal2-icon.swal2-icon-question{border-color:var(--info);color:var(--info)}
 .swal2-icon.swal2-icon-warning{border-color:var(--warning);color:var(--warning)}
-.swal2-checkbox{display:flex;align-items:center;gap:9px;color:var(--foreground);font-family:'Arial',sans-serif;font-size:13px;margin:5px 0}
-.swal2-checkbox input{accent-color:var(--primary)}
+.swal-import-option{display:flex;align-items:center;gap:9px;color:var(--foreground);font-family:'Arial',sans-serif;font-size:13px;margin:6px 0;cursor:pointer;text-align:left}
+.swal-import-option input{accent-color:var(--primary);width:16px;height:16px;flex:none}
 .swal2-container.swal2-backdrop-show{background:color-mix(in oklch,var(--background) 80%,transparent)}

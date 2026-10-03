@@ -42,7 +42,7 @@ const importLabels: Record<ImportCategory, string> = { server: 'Servidor', prese
 export async function chooseExtraImports(detected: ImportCategory[]): Promise<ImportCategory[] | null> {
   if (detected.length === 0) return [];
   const options = detected.map((category) =>
-    `<label class="swal2-checkbox" style="display:flex;align-items:center;gap:9px;color:var(--foreground);font-family:'Arial',sans-serif;font-size:13px;margin:5px 0"><input type="checkbox" value="${category}" checked class="swal-import-opt"><span class="swal2-label">${importLabels[category]}</span></label>`
+    `<label class="swal-import-option"><input type="checkbox" value="${category}" checked class="swal-import-opt"><span>${importLabels[category]}</span></label>`
   ).join('');
   const result = await Swal.fire({
     ...baseTheme,
