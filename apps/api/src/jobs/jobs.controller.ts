@@ -7,7 +7,7 @@ function cookie(request: RequestLike): string | undefined { const value = reques
 
 @Controller('build-jobs')
 export class JobsController {
-  constructor(@Inject('SESSION_SERVICE') private readonly sessions: SessionService, private readonly jobs: JobsService) {}
+  constructor(@Inject('SESSION_SERVICE') private readonly sessions: SessionService, @Inject(JobsService) private readonly jobs: JobsService) {}
   @Post(':id/cancel') async cancel(@Param('id') id: string, @Req() request: RequestLike, @Headers('x-csrf-token') csrf: string | undefined) { const actor = await this.sessions.authenticate(cookie(request)); this.sessions.assertCsrf(actor, csrf); return this.jobs.cancel(actor, id); }
   @Post(':id/retry') async retry(@Param('id') id: string, @Body() body: { riskConfirmed?: unknown }, @Req() request: RequestLike, @Headers('x-csrf-token') csrf: string | undefined) { const actor = await this.sessions.authenticate(cookie(request)); this.sessions.assertCsrf(actor, csrf); return this.jobs.retry(actor, id, body?.riskConfirmed === true); }
   @Post(':id/reconcile') async reconcile(@Param('id') id: string, @Body() body: unknown, @Req() request: RequestLike, @Headers('x-csrf-token') csrf: string | undefined) { const actor = await this.sessions.authenticate(cookie(request)); this.sessions.assertCsrf(actor, csrf); return this.jobs.reconcile(actor, id, body); }
