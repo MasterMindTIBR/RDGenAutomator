@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as AdminBrandingRouteImport } from './routes/admin/branding'
+import { Route as AdminGroupsRouteImport } from './routes/admin/groups'
 import { Route as AdminHealthRouteImport } from './routes/admin/health'
 import { Route as AdminPresetsRouteImport } from './routes/admin/presets'
 import { Route as AdminRetentionRouteImport } from './routes/admin/retention'
@@ -41,6 +42,11 @@ const NewRoute = NewRouteImport.update({
 const AdminBrandingRoute = AdminBrandingRouteImport.update({
   id: '/admin/branding',
   path: '/admin/branding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminGroupsRoute = AdminGroupsRouteImport.update({
+  id: '/admin/groups',
+  path: '/admin/groups',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminHealthRoute = AdminHealthRouteImport.update({
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
+  '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
   '/admin/retention': typeof AdminRetentionRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
+  '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
   '/admin/retention': typeof AdminRetentionRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
+  '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
   '/admin/retention': typeof AdminRetentionRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/new'
     | '/admin/branding'
+    | '/admin/groups'
     | '/admin/health'
     | '/admin/presets'
     | '/admin/retention'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/new'
     | '/admin/branding'
+    | '/admin/groups'
     | '/admin/health'
     | '/admin/presets'
     | '/admin/retention'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/new'
     | '/admin/branding'
+    | '/admin/groups'
     | '/admin/health'
     | '/admin/presets'
     | '/admin/retention'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   NewRoute: typeof NewRoute
   AdminBrandingRoute: typeof AdminBrandingRoute
+  AdminGroupsRoute: typeof AdminGroupsRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminPresetsRoute: typeof AdminPresetsRoute
   AdminRetentionRoute: typeof AdminRetentionRoute
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/branding'
       fullPath: '/admin/branding'
       preLoaderRoute: typeof AdminBrandingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/groups': {
+      id: '/admin/groups'
+      path: '/admin/groups'
+      fullPath: '/admin/groups'
+      preLoaderRoute: typeof AdminGroupsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/health': {
@@ -300,6 +320,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   NewRoute: NewRoute,
   AdminBrandingRoute: AdminBrandingRoute,
+  AdminGroupsRoute: AdminGroupsRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminPresetsRoute: AdminPresetsRoute,
   AdminRetentionRoute: AdminRetentionRoute,
