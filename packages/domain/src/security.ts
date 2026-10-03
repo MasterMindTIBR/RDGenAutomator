@@ -38,3 +38,8 @@ export function opaqueTokenMatches(token: string, expectedHash: string): boolean
   const expected = Buffer.from(expectedHash);
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
+
+/** Shared strength rule for any password an administrator or user sets through the panel. */
+export function isStrongPassword(password: string): boolean {
+  return password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
+}

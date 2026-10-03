@@ -1,14 +1,12 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, Inject, NotFoundException, Param, Post, Req } from '@nestjs/common';
 import type { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
+import { isStrongPassword } from '@rdgen/domain';
 import type { SessionService } from '../auth/session.service.js';
 import { AuditService } from '../audit.service.js';
 
 type RequestLike = { headers: Record<string, string | string[] | undefined> };
 function cookie(request: RequestLike): string | undefined { const value = request.headers.cookie; return Array.isArray(value) ? value[0] : value; }
-function isStrongPassword(password: string): boolean {
-  return password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
-}
 
 @Controller('admin/users')
 export class AdminUsersController {

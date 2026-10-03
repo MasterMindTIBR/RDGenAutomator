@@ -152,6 +152,29 @@ export class SessionService {
     } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
   }
 
+  async changePassword(actor: SessionActor, currentPassword: string, newPassword: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const users = await client.query<{ passwordHash: string }>(
+        `SELECT password_hash AS "passwordHash" FROM users WHERE id = $1 FOR UPDATE`, [actor.userId]
+      );
+      const current = users.rows[0];
+      if (!current || !(await bcrypt.compare(currentPassword, current.passwordHash))) {
+        await client.query('ROLLBACK');
+        throw new UnauthorizedException('Current password is incorrect.');
+      }
+      const hash = await bcrypt.hash(newPassword, 12);
+      await client.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [hash, actor.userId]);
+      await client.query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL AND id <> $2', [actor.userId, actor.sessionId]);
+      await this.record(client, actor.userId, 'auth.password_changed', 'user', actor.userId, {});
+      await client.query('COMMIT');
+    } catch (error) {
+      if (!(error instanceof UnauthorizedException)) await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
   cookiesForLogin(token: string, csrfToken: string): string[] { return [sessionCookie(token, this.environment), csrfCookie(csrfToken, this.environment)]; }
   cookiesForLogout(): string[] { return [clearedSessionCookie(this.environment), csrfCookie('', this.environment, 0)]; }
 
