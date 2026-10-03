@@ -18,9 +18,9 @@ class LoginRateLimitException extends HttpException {
   constructor(message: string) { super(message, HttpStatus.TOO_MANY_REQUESTS); }
 }
 
-export type SessionActor = AuthenticatedActor & { email: string; csrfHash: string };
+export type SessionActor = AuthenticatedActor & { email: string; name: string; csrfHash: string };
 export type LoginResult = { actor: SessionActor; sessionToken: string; csrfToken: string };
-type LoginUser = { id: string; email: string; passwordHash: string; role: UserRole; status: 'active' | 'disabled' };
+type LoginUser = { id: string; email: string; name: string; passwordHash: string; role: UserRole; status: 'active' | 'disabled' };
 
 export function parseCookies(header: string | undefined): Record<string, string> {
   if (!header) return {};
@@ -71,7 +71,7 @@ export class SessionService {
         throw new LoginRateLimitException('Login temporarily locked. Try again later.');
       }
       const users = await client.query<LoginUser>(
-        `SELECT id, email, password_hash AS "passwordHash", role, status
+        `SELECT id, email, name, password_hash AS "passwordHash", role, status
          FROM users WHERE email = $1 FOR UPDATE`, [email]
       );
       const user = users.rows[0];
@@ -114,7 +114,7 @@ export class SessionService {
       await client.query('UPDATE users SET last_login_at = now(), updated_at = now() WHERE id = $1', [user.id]);
       await this.record(client, user.id, 'auth.login', 'session', session.rows[0].id, {});
       await client.query('COMMIT');
-      return { actor: { userId: user.id, role: user.role, email: user.email, sessionId: session.rows[0].id, csrfHash: hashOpaqueToken(csrfToken) }, sessionToken, csrfToken };
+      return { actor: { userId: user.id, role: user.role, email: user.email, name: user.name, sessionId: session.rows[0].id, csrfHash: hashOpaqueToken(csrfToken) }, sessionToken, csrfToken };
     } catch (error) {
       if (!(error instanceof UnauthorizedException) && !(error instanceof LoginRateLimitException)) await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -125,9 +125,9 @@ export class SessionService {
     const token = parseCookies(cookieHeader)[SESSION_COOKIE];
     if (!token) throw new UnauthorizedException('Authentication required.');
     const result = await this.pool.query<{
-      sessionId: string; userId: string; email: string; role: UserRole; csrfHash: string;
+      sessionId: string; userId: string; email: string; name: string; role: UserRole; csrfHash: string;
     }>(
-      `SELECT s.id AS "sessionId", u.id AS "userId", u.email, u.role, s.csrf_hash AS "csrfHash"
+      `SELECT s.id AS "sessionId", u.id AS "userId", u.email, u.name, u.role, s.csrf_hash AS "csrfHash"
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.status = 'active'`,
       [hashOpaqueToken(token)]

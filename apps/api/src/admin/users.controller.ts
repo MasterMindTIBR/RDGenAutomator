@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, Inject, NotFoundException, Param, Post, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, Inject, NotFoundException, Param, Patch, Post, Req } from '@nestjs/common';
 import type { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import { isStrongPassword } from '@rdgen/domain';
@@ -20,7 +20,7 @@ export class AdminUsersController {
   async list(@Req() request: RequestLike) {
     const actor = await this.administrator(request);
     const users = await this.pool.query(
-      `SELECT id, email, role, status, last_login_at AS "lastLoginAt", created_at AS "createdAt", updated_at AS "updatedAt"
+      `SELECT id, email, name, role, status, last_login_at AS "lastLoginAt", created_at AS "createdAt", updated_at AS "updatedAt"
        FROM users ORDER BY created_at ASC`
     );
     await this.audit.record(actor.userId, 'admin.users_listed', 'user', 'collection', {});
@@ -32,16 +32,17 @@ export class AdminUsersController {
     const actor = await this.administrator(request);
     this.sessions.assertCsrf(actor, csrfToken);
     if (!body || typeof body !== 'object') throw new BadRequestException('Email and password are required.');
-    const { email, password, role = 'user' } = body as Record<string, unknown>;
+    const { email, password, role = 'user', name } = body as Record<string, unknown>;
     if (typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email) || typeof password !== 'string' || !isStrongPassword(password)) {
       throw new BadRequestException('A valid email and a strong password are required.');
     }
     if (role !== 'user' && role !== 'administrator') throw new BadRequestException('Role must be user or administrator.');
+    const displayName = typeof name === 'string' ? name.trim().slice(0, 120) : '';
     const hash = await bcrypt.hash(password, 12);
     try {
-      const created = await this.pool.query<{ id: string; email: string; role: string; status: string }>(
-        `INSERT INTO users (email, password_hash, role, status) VALUES ($1, $2, $3, 'active')
-         RETURNING id, email, role, status`, [email.trim().toLowerCase(), hash, role]
+      const created = await this.pool.query<{ id: string; email: string; name: string; role: string; status: string }>(
+        `INSERT INTO users (email, name, password_hash, role, status) VALUES ($1, $2, $3, $4, 'active')
+         RETURNING id, email, name, role, status`, [email.trim().toLowerCase(), displayName, hash, role]
       );
       await this.audit.record(actor.userId, 'admin.user_created', 'user', created.rows[0].id, { role: created.rows[0].role });
       return { user: created.rows[0] };
@@ -70,6 +71,22 @@ export class AdminUsersController {
       await client.query('COMMIT');
       return { user: { id, status: 'disabled' } };
     } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
+  }
+
+  @Patch(':id')
+  async rename(@Param('id') id: string, @Body() body: unknown, @Req() request: RequestLike, @Headers('x-csrf-token') csrfToken: string | undefined) {
+    const actor = await this.administrator(request);
+    this.sessions.assertCsrf(actor, csrfToken);
+    if (!body || typeof body !== 'object') throw new BadRequestException('Name is required.');
+    const { name } = body as Record<string, unknown>;
+    if (typeof name !== 'string') throw new BadRequestException('Name must be a string.');
+    const displayName = name.trim().slice(0, 120);
+    const updated = await this.pool.query<{ id: string; name: string }>(
+      `UPDATE users SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name`, [id, displayName]
+    );
+    if (updated.rowCount !== 1) throw new NotFoundException('User not found.');
+    await this.audit.record(actor.userId, 'admin.user_renamed', 'user', id, {});
+    return { user: { id, name: displayName } };
   }
 
   private async administrator(request: RequestLike) {

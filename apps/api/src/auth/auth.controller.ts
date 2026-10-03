@@ -10,7 +10,7 @@ function singleHeader(value: string | string[] | undefined): string | undefined 
 }
 
 function actorResponse(actor: SessionActor, csrfToken: string) {
-  return { user: { id: actor.userId, email: actor.email, role: actor.role }, csrfToken };
+  return { user: { id: actor.userId, email: actor.email, name: actor.name, role: actor.role }, csrfToken };
 }
 
 @Controller()
@@ -52,6 +52,6 @@ export class AuthController {
   @Get('me')
   async currentUser(@Req() request: RequestLike) {
     const actor = await this.sessions.authenticate(singleHeader(request.headers.cookie));
-    return { user: { id: actor.userId, email: actor.email, role: actor.role } };
+    return { user: { id: actor.userId, email: actor.email, name: actor.name, role: actor.role } };
   }
 }
