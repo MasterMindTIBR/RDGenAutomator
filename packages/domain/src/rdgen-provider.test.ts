@@ -39,3 +39,8 @@ test('RDGen status parser keeps Actions links out of callers HTML concerns', asy
   const status = await provider.getBuildStatus({ uuid: '11111111-1111-4111-8111-111111111111', filename: 'acme', platform: 'windows', statusUrl: 'https://rdgen.crayoneater.org/check_for_file?filename=acme&uuid=11111111-1111-4111-8111-111111111111&platform=windows' });
   assert.equal(status.stage, 'succeeded'); assert.equal(status.actionUrl, 'https://github.com/example/rdgen/actions/runs/42'); assert.equal(status.manifest?.artifacts.length, 2);
 });
+test('RDGen status parser reports the live interruption response as a failed build', async () => {
+  const provider = new RdgenProvider({ fetch: async () => new Response('<h2 class="error-header">Workflow Interrupted</h2><a href="https://github.com/bryangerlach/rdgen/actions/runs/37219299194">Check GitHub Logs for error details ↗</a>', { status: 200 }) });
+  const status = await provider.getBuildStatus({ uuid: '11111111-1111-4111-8111-111111111111', filename: 'acme', platform: 'windows', statusUrl: 'https://rdgen.crayoneater.org/check_for_file?filename=acme&uuid=11111111-1111-4111-8111-111111111111&platform=windows' });
+  assert.equal(status.stage, 'failed'); assert.equal(status.text, 'Workflow Interrupted'); assert.equal(status.actionUrl, 'https://github.com/bryangerlach/rdgen/actions/runs/37219299194');
+});

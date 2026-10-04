@@ -25,9 +25,11 @@ function decodeQuery(html: string): URLSearchParams {
   return new URL(match[1], productionOrigin).searchParams;
 }
 function textStatus(html: string): string {
-  const match = /<span\s+id=["']statusText["'][^>]*>([\s\S]*?)<\/span>/i.exec(html);
-  if (!match) throw new RdgenProtocolError('RDGen protocol changed: statusText is missing');
-  return match[1].replace(/<[^>]+>/g, '').trim();
+  const status = /<span\s+id=["']statusText["'][^>]*>([\s\S]*?)<\/span>/i.exec(html);
+  if (status) return status[1].replace(/<[^>]+>/g, '').trim();
+  const interruption = /<h[1-6]\b[^>]*\bclass=["'][^"']*\berror-header\b[^"']*["'][^>]*>([\s\S]*?)<\/h[1-6]>/i.exec(html);
+  if (interruption) return interruption[1].replace(/<[^>]+>/g, '').trim();
+  throw new RdgenProtocolError('RDGen protocol changed: statusText is missing');
 }
 function action(html: string, base: string): string | undefined {
   const match = /<a\b[^>]*href=["']([^"']+)["'][^>]*>[^<]*(?:Actions|GitHub)[^<]*<\/a>/i.exec(html);
@@ -78,7 +80,7 @@ export class RdgenProvider {
     if (!response.ok) throw new RdgenProtocolError(`RDGen status rejected with HTTP ${response.status}`);
     const html = await response.text(); const text = textStatus(html); const actionUrl = action(html, this.baseUrl) ?? remote.actionUrl;
     const lowered = text.toLowerCase();
-    if (/(failure|cancelled|timed_out|skipped|action_required|failed)/.test(lowered)) return { stage: 'failed', text, ...(actionUrl ? { actionUrl } : {}) };
+    if (/(failure|cancelled|interrupted|timed_out|skipped|action_required|failed)/.test(lowered)) return { stage: 'failed', text, ...(actionUrl ? { actionUrl } : {}) };
     if (/(success|generated|complete)/.test(lowered)) return { stage: 'succeeded', text, ...(actionUrl ? { actionUrl } : {}), manifest: this.getDownloadManifest({ ...remote, ...(actionUrl ? { actionUrl } : {}) }) };
     return { stage: 'pending', text, ...(actionUrl ? { actionUrl } : {}) };
   }
