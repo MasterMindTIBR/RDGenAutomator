@@ -70,13 +70,13 @@ export function RequestDetail() {
   const navigate = useNavigate();
   const request = data.requests.find((r) => r.id === id);
   const [busy, setBusy] = useState(false);
-  if (!request || !(currentUser?.role === 'administrator' || request.canManage === true || request.visibility === 'published')) return <Page><Empty title="Solicitação não encontrada" description="Esta solicitação não está disponível para sua conta." action={<Button asChild variant="outline"><Link to="/dashboard">Voltar</Link></Button>} /></Page>;
-  const own = currentUser?.role === 'administrator' || request.canManage === true;
-  const jobs = data.jobs.filter((j) => j.requestId === id);
   const [bulkScope, setBulkScope] = useState<'all' | 'failed'>('failed');
   const [publishing, setPublishing] = useState(false);
   const [pubUsers, setPubUsers] = useState<Record<string, boolean>>({});
   const [pubGroups, setPubGroups] = useState<Record<string, boolean>>({});
+  if (!request || !(currentUser?.role === 'administrator' || request.canManage === true || request.visibility === 'published')) return <Page><Empty title="Solicitação não encontrada" description="Esta solicitação não está disponível para sua conta." action={<Button asChild variant="outline"><Link to="/dashboard">Voltar</Link></Button>} /></Page>;
+  const own = currentUser?.role === 'administrator' || request.canManage === true;
+  const jobs = data.jobs.filter((j) => j.requestId === id);
   async function withdraw() { setBusy(true); try { await repository.visibility(id, 'private'); toast.success('Solicitação ocultada'); } finally { setBusy(false); } }
   async function publish(e: FormEvent) { e.preventDefault(); setBusy(true); try { await repository.visibility(id, 'published', { userIds: Object.keys(pubUsers).filter((k) => pubUsers[k]), groupIds: Object.keys(pubGroups).filter((k) => pubGroups[k]) }); toast.success('Solicitação publicada'); setPublishing(false); } finally { setBusy(false); } }
   async function bulk(action: 'retry' | 'reconcile') { if (!(await confirmSwal(action === 'retry' ? 'Retry em lote?' : 'Reconciliar em lote?', { text: action === 'retry' ? 'Reenviará os jobs com falha desta solicitação, podendo duplicar builds externos.' : 'Marcará os jobs com início indeterminado como falha.', danger: action === 'reconcile', confirmText: 'Confirmar' }))) return; setBusy(true); try { const result = await repository.bulkAction(id, action, bulkScope); toast.success(`${result.acted} job(s) atualizado(s).`); } finally { setBusy(false); } }
