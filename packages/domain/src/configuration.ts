@@ -51,7 +51,8 @@ export const buildRequestInputSchema = z.object({
   profiles: z.array(profileSchema).min(1).max(2).superRefine((values, context) => unique(values, context, 'Profiles must be unique.')),
   platforms: z.array(platformSchema).min(1).max(5).superRefine((values, context) => unique(values, context, 'Platforms must be unique.')),
   version: z.string().trim().min(1).max(80),
-  images: z.object({ icon: pngUploadSchema.optional(), logo: pngUploadSchema.optional(), privacyScreen: pngUploadSchema.optional() }).strict().optional()
+  images: z.object({ icon: pngUploadSchema.optional(), logo: pngUploadSchema.optional(), privacyScreen: pngUploadSchema.optional() }).strict().optional(),
+  cloneToken: z.string().uuid().optional()
 }).strict().superRefine((value, context) => { for (const profile of value.profiles) if (!value.presets[profile]) context.addIssue({ code: z.ZodIssueCode.custom, path: ['presets', profile], message: `A ${profile} preset is required.` }); });
 export type BuildRequestInput = z.infer<typeof buildRequestInputSchema>;
 

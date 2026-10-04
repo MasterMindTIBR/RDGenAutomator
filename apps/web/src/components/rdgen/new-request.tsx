@@ -1,4 +1,4 @@
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, ImagePlus, Info, Plus, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { toast } from 'sonner';
@@ -43,6 +43,9 @@ export function NewRequest() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [idempotencyKey, setIdempotencyKey] = useState('');
+  const [cloneToken, setCloneToken] = useState<string | undefined>(undefined);
+  const [cloneMissing, setCloneMissing] = useState<{ icon: boolean; logo: boolean; privacy: boolean }>({ icon: false, logo: false, privacy: false });
+  const { clone } = useSearch({ from: '/new' });
   const branding = data.brandings.find(b => b.id === brandingId);
   function selectCompany(id: string) {
     setCompanyId(id);
@@ -59,6 +62,28 @@ export function NewRequest() {
   useEffect(() => { if (step === 0 && !serverId && data.servers[0]) setServerId(data.servers[0].id); }, [data.servers, serverId, step]);
   useEffect(() => { if (!data.releases.includes(version) && data.releases[0]) setVersion(data.releases[0]); }, [data.releases, version]);
   useEffect(() => { setPresets((prev) => { let changed = false; const next = { ...prev }; for (const profile of profiles) { if (!next[profile]) { const found = data.presets.find((preset) => preset.profile === profile)?.id; if (found) { next[profile] = found; changed = true; } } } return changed ? next : prev; }); }, [data.presets, profiles]);
+
+  useEffect(() => {
+    if (!clone) return;
+    let cancelled = false;
+    repository.cloneDraftInfo(clone).then((draft) => {
+      if (cancelled) return;
+      setDisplayName(draft.displayName);
+      setTechnicalName(draft.technicalName);
+      setServerId(draft.serverId);
+      setBrandingId(draft.brandingId ?? '');
+      setCompanyId(draft.companyId ?? '');
+      setPresets({ full: draft.presets.full, qs: draft.presets.qs });
+      setProfiles(draft.profiles);
+      setPlatforms([...draft.platforms]);
+      setVersion(draft.version);
+      setImages({ ...(draft.images.icon ? { icon: draft.images.icon } : {}), ...(draft.images.logo ? { logo: draft.images.logo } : {}), ...(draft.images.privacy ? { privacy: draft.images.privacy } : {}) });
+      setCloneMissing(draft.missing);
+      setCloneToken(draft.token);
+      toast.info('Solicitação clonada: revise e ajuste antes de criar.');
+    }).catch(() => { if (!cancelled) { toast.error('Clone expirado ou indisponível.'); navigate({ to: '/new' }); } });
+    return () => { cancelled = true; };
+  }, [clone, repository]);
 
   async function refreshReleases() { setRefreshing(true); await repository.refreshReleases(); setRefreshing(false); toast.success('Lista de versões atualizada'); }
 
@@ -77,7 +102,7 @@ export function NewRequest() {
     setBusy(true);
     try {
       const finalImages: Images = { ...(branding?.images ?? {}), ...Object.fromEntries(Object.entries(images).filter(([, v]) => v)) };
-      const id = await repository.createRequest({ displayName: displayName.trim(), technicalName: technicalName.trim(), serverId, profiles, platforms, version, ...(brandingId ? { brandingId } : {}), ...(companyId ? { companyId } : {}), images: finalImages, presetIds: Object.fromEntries(Object.entries(presets).filter(([k, v]) => v && profiles.includes(k as Profile))) as Partial<Record<Profile, string>>, password: !both || !separate ? password || undefined : undefined, profilePasswords: both && separate ? { full: password || undefined, qs: passwordQs || undefined } : undefined, idempotencyKey });
+      const id = await repository.createRequest({ displayName: displayName.trim(), technicalName: technicalName.trim(), serverId, profiles, platforms, version, ...(brandingId ? { brandingId } : {}), ...(companyId ? { companyId } : {}), images: finalImages, presetIds: Object.fromEntries(Object.entries(presets).filter(([k, v]) => v && profiles.includes(k as Profile))) as Partial<Record<Profile, string>>, password: !both || !separate ? password || undefined : undefined, profilePasswords: both && separate ? { full: password || undefined, qs: passwordQs || undefined } : undefined, ...(cloneToken ? { cloneToken } : {}), idempotencyKey });
       setPassword(''); setPasswordQs('');
       toast.success(`${jobs} jobs criados`);
       navigate({ to: '/requests/$id', params: { id } });
@@ -93,6 +118,7 @@ export function NewRequest() {
     <div className="wizard">
       <div className="step-rail">{steps.map((name, i) => <Button key={name} variant="ghost" className={`step-item ${i === step ? 'selected' : ''} ${i < step ? 'completed' : ''}`} onClick={() => { if (i < step) { setStep(i); setError(''); } }}><span className="step-number">{i < step ? <Check size={14} /> : String(i + 1).padStart(2, '0')}</span><span>{name}{(i === 3 || i === 4) ? <small style={{ display: 'block', opacity: .6 }}>opcional</small> : null}</span></Button>)}</div>
       <div className="wizard-main">
+        {cloneToken && (cloneMissing.icon || cloneMissing.logo || cloneMissing.privacy) && <div className="hint" style={{ marginBottom: 12 }}><Info size={16} /> Algumas imagens da solicitação original não estão mais disponíveis. Envie a substituição na etapa Identidade visual ou continue sem elas.</div>}
         <div className="wizard-top"><span>ETAPA {String(step + 1).padStart(2, '0')} / 06</span><div className="step-track"><i style={{ width: `${((step + 1) / 6) * 100}%` }} /></div></div>
 
         {step === 0 && <section className="wizard-section"><div className="section-kicker">01 / GERAL & SERVIDOR</div><h2>Identidade do cliente</h2><p>Defina como o aplicativo será apresentado e a qual servidor irá se conectar.</p>

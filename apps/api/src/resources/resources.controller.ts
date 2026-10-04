@@ -86,7 +86,7 @@ export class ResourcesController {
     await this.assertAudience(actor, resource.id, resource.creatorId, resource.visibility);
     const [jobs, artifacts] = await Promise.all([
       this.pool.query(`SELECT j.id, j.profile, j.platform, j.version, j.status, j.manual_retry_after AS "manualRetryAfter", j.last_error_code AS "lastErrorCode", j.cancellation_remote_may_continue AS "cancellationRemoteMayContinue", j.created_at AS "createdAt", j.updated_at AS "updatedAt",
-        COALESCE((SELECT json_agg(json_build_object('id', a.id, 'number', a.attempt_number, 'status', a.status, 'stage', a.remote_stage, 'errorCode', a.error_code, 'riskConfirmedAt', a.risk_confirmed_at, 'createdAt', a.created_at, 'updatedAt', a.updated_at) ORDER BY a.attempt_number DESC)
+        COALESCE((SELECT json_agg(json_build_object('id', a.id, 'number', a.attempt_number, 'status', a.status, 'stage', a.remote_stage, 'errorCode', a.error_code, 'riskConfirmedAt', a.risk_confirmed_at, 'actionTelemetry', a.action_telemetry, 'createdAt', a.created_at, 'updatedAt', a.updated_at) ORDER BY a.attempt_number DESC)
                   FROM build_attempts a WHERE a.job_id = j.id), '[]'::json) AS attempts
         FROM build_jobs j WHERE j.request_id = $1 ORDER BY j.created_at`, [id]),
       this.pool.query(`SELECT a.id, a.sha256, a.bytes, a.content_type AS "contentType", a.created_at AS "createdAt" FROM artifacts a JOIN build_jobs j ON j.id = a.job_id WHERE j.request_id = $1 ORDER BY a.created_at`, [id])

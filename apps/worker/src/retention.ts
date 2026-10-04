@@ -9,19 +9,32 @@ type Stored = { id: string; storageKey: string };
 export class RetentionService {
   private readonly owner = `retention-${randomUUID()}`; private readonly root: string;
   constructor(private readonly pool: Pool, storagePath: string) { this.root = resolve(storagePath); }
-  async run(limit = 100): Promise<{ artifacts: number; logos: number; actionSnapshots: number; skipped: boolean }> {
+  async run(limit = 100): Promise<{ artifacts: number; logos: number; cloneDrafts: number; actionSnapshots: number; skipped: boolean }> {
     const claimed = await this.pool.query(`UPDATE retention_leases SET owner = $1, expires_at = now() + interval '5 minutes', updated_at = now() WHERE name = 'persistent-storage' AND (expires_at IS NULL OR expires_at < now() OR owner = $1) RETURNING name`, [this.owner]);
-    if (!claimed.rowCount) return { artifacts: 0, logos: 0, actionSnapshots: 0, skipped: true };
+    if (!claimed.rowCount) return { artifacts: 0, logos: 0, cloneDrafts: 0, actionSnapshots: 0, skipped: true };
     try {
       const artifacts = await this.tombstoneArtifacts(limit); const logos = await this.tombstoneRequestImages(limit);
+      const cloneDrafts = await this.sweepCloneDrafts(limit);
       const actionSnapshots = await sweepTerminalActionSnapshots(this.pool);
-      return { artifacts, logos, actionSnapshots, skipped: false };
+      return { artifacts, logos, cloneDrafts, actionSnapshots, skipped: false };
     } finally { await this.pool.query(`UPDATE retention_leases SET owner = NULL, expires_at = NULL, updated_at = now() WHERE name = 'persistent-storage' AND owner = $1`, [this.owner]); }
   }
   private safePath(key: string, prefix: string): string {
     const path = resolve(this.root, key); const inside = relative(this.root, path);
     if (!inside || inside.startsWith('..') || inside.includes('..\\') || !inside.startsWith(prefix)) throw new Error('Refusing retention outside protected storage');
     return path;
+  }
+  private async sweepCloneDrafts(limit: number): Promise<number> {
+    const due = await this.pool.query<{ token: string; icon: string | null; logo: string | null; privacy: string | null }>(
+      `SELECT token, icon_storage_key AS icon, logo_storage_key AS logo, privacy_storage_key AS privacy
+       FROM clone_drafts WHERE consumed_at IS NOT NULL OR expires_at < now() ORDER BY expires_at LIMIT $1`, [limit]);
+    for (const draft of due.rows) {
+      for (const key of [draft.icon, draft.logo, draft.privacy]) {
+        if (key) await rm(this.safePath(key, 'request-images/'), { force: true });
+      }
+      await this.pool.query('DELETE FROM clone_drafts WHERE token = $1', [draft.token]);
+    }
+    return due.rowCount ?? 0;
   }
   private async tombstoneArtifacts(limit: number): Promise<number> {
     const marked = await this.pool.query<Stored>(
