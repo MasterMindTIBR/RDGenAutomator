@@ -25,6 +25,7 @@ import { Route as ClientesIndexRouteImport } from './routes/clientes.index'
 import { Route as ClientesIdRouteImport } from './routes/clientes.$id'
 import { Route as RequestsIndexRouteImport } from './routes/requests.index'
 import { Route as RequestsIdRouteImport } from './routes/requests.$id'
+import { Route as AdminCompaniesIdRouteImport } from './routes/admin/companies.$id'
 import { Route as ApiBackendSplatRouteImport } from './routes/api/backend/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -107,6 +108,11 @@ const RequestsIdRoute = RequestsIdRouteImport.update({
   path: '/requests/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCompaniesIdRoute = AdminCompaniesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminCompaniesRoute,
+} as any)
 const ApiBackendSplatRoute = ApiBackendSplatRouteImport.update({
   id: '/api/backend/$',
   path: '/api/backend/$',
@@ -118,7 +124,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
-  '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/companies': typeof AdminCompaniesRouteWithChildren
   '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/requests/$id': typeof RequestsIdRoute
   '/clientes/': typeof ClientesIndexRoute
   '/requests/': typeof RequestsIndexRoute
+  '/admin/companies/$id': typeof AdminCompaniesIdRoute
   '/api/backend/$': typeof ApiBackendSplatRoute
 }
 export interface FileRoutesByTo {
@@ -137,7 +144,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
-  '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/companies': typeof AdminCompaniesRouteWithChildren
   '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/requests/$id': typeof RequestsIdRoute
   '/clientes': typeof ClientesIndexRoute
   '/requests': typeof RequestsIndexRoute
+  '/admin/companies/$id': typeof AdminCompaniesIdRoute
   '/api/backend/$': typeof ApiBackendSplatRoute
 }
 export interface FileRoutesById {
@@ -157,7 +165,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
-  '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/companies': typeof AdminCompaniesRouteWithChildren
   '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/requests/$id': typeof RequestsIdRoute
   '/clientes/': typeof ClientesIndexRoute
   '/requests/': typeof RequestsIndexRoute
+  '/admin/companies/$id': typeof AdminCompaniesIdRoute
   '/api/backend/$': typeof ApiBackendSplatRoute
 }
 export interface FileRouteTypes {
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
     | '/requests/$id'
     | '/clientes/'
     | '/requests/'
+    | '/admin/companies/$id'
     | '/api/backend/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/requests/$id'
     | '/clientes'
     | '/requests'
+    | '/admin/companies/$id'
     | '/api/backend/$'
   id:
     | '__root__'
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/requests/$id'
     | '/clientes/'
     | '/requests/'
+    | '/admin/companies/$id'
     | '/api/backend/$'
   fileRoutesById: FileRoutesById
 }
@@ -236,7 +248,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   NewRoute: typeof NewRoute
   AdminBrandingRoute: typeof AdminBrandingRoute
-  AdminCompaniesRoute: typeof AdminCompaniesRoute
+  AdminCompaniesRoute: typeof AdminCompaniesRouteWithChildren
   AdminGroupsRoute: typeof AdminGroupsRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminPresetsRoute: typeof AdminPresetsRoute
@@ -365,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RequestsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/companies/$id': {
+      id: '/admin/companies/$id'
+      path: '/$id'
+      fullPath: '/admin/companies/$id'
+      preLoaderRoute: typeof AdminCompaniesIdRouteImport
+      parentRoute: typeof AdminCompaniesRoute
+    }
     '/api/backend/$': {
       id: '/api/backend/$'
       path: '/api/backend/$'
@@ -375,12 +394,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminCompaniesRouteChildren {
+  AdminCompaniesIdRoute: typeof AdminCompaniesIdRoute
+}
+
+const AdminCompaniesRouteChildren: AdminCompaniesRouteChildren = {
+  AdminCompaniesIdRoute: AdminCompaniesIdRoute,
+}
+
+const AdminCompaniesRouteWithChildren = AdminCompaniesRoute._addFileChildren(
+  AdminCompaniesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   NewRoute: NewRoute,
   AdminBrandingRoute: AdminBrandingRoute,
-  AdminCompaniesRoute: AdminCompaniesRoute,
+  AdminCompaniesRoute: AdminCompaniesRouteWithChildren,
   AdminGroupsRoute: AdminGroupsRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminPresetsRoute: AdminPresetsRoute,

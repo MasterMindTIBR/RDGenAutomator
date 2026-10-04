@@ -54,6 +54,8 @@ export function NewRequest() {
       setServerId(company.serverId);
       setBrandingId(company.brandingId || '');
       setPresets(prev => ({ full: company.presetFullId || prev.full, qs: company.presetQsId || prev.qs }));
+      if (company.defaultDisplayName && !displayName.trim()) setDisplayName(company.defaultDisplayName);
+      if (company.defaultTechnicalName && !technicalName.trim()) setTechnicalName(company.defaultTechnicalName);
     }
   }
   const both = profiles.length === 2;

@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   try {
     await command('docker', ['compose', ...project, ...composeFiles, 'up', '-d', '--wait', 'postgres', 'redis']);
     await command(process.execPath, ['--import', 'tsx', 'apps/api/src/database/migrate.ts'], testEnv);
-    await command(process.execPath, ['--import', 'tsx', '--test', 'apps/api/test-integration/telemetry-projection.test.ts', 'apps/api/test-integration/clone-draft.test.ts'], { ...testEnv, TSX_TSCONFIG_PATH: 'apps/api/tsconfig.json' });
+    await command(process.execPath, ['--import', 'tsx', '--test', 'apps/api/test-integration/telemetry-projection.test.ts', 'apps/api/test-integration/clone-draft.test.ts', 'apps/api/test-integration/company-detail.test.ts'], { ...testEnv, TSX_TSCONFIG_PATH: 'apps/api/tsconfig.json' });
     await command(process.execPath, ['--import', 'tsx', '--test', 'apps/worker/test-integration/workflow-retry.test.ts'], testEnv);
     console.log('API integration proof passed.');
   } finally {

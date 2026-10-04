@@ -57,9 +57,12 @@ export const buildRequestInputSchema = z.object({
 export type BuildRequestInput = z.infer<typeof buildRequestInputSchema>;
 
 /** A company bundles the defaults for one client's builds: which server/branding/presets to pre-select, and which past request is exposed on the public download page. */
+const optionalDisplayName = z.union([safeName, z.literal('')]).transform((value) => (value === '' ? undefined : value)).optional();
+const optionalTechnicalName = z.union([z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'Technical name may contain only letters, digits, dot, underscore and hyphen.'), z.literal('')]).transform((value) => (value === '' ? undefined : value)).optional();
 export const companyAdminInputSchema = z.object({
   name: safeName, serverId: z.string().uuid(),
   brandingId: z.string().uuid().optional(), presetFullId: z.string().uuid().optional(), presetQsId: z.string().uuid().optional(),
+  defaultDisplayName: optionalDisplayName, defaultTechnicalName: optionalTechnicalName,
   isPublic: z.boolean(), publicRequestId: z.string().uuid().optional()
 }).strict();
 export type CompanyAdminInput = z.infer<typeof companyAdminInputSchema>;

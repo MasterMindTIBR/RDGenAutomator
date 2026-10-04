@@ -1,0 +1,3 @@
+import { createFileRoute } from '@tanstack/react-router';
+import { CompanyDetail } from '@/components/rdgen/company-detail';
+export const Route=createFileRoute('/admin/companies/$id')({head:()=>({meta:[{title:'Histórico da empresa — RDGen Automator'},{name:'description',content:'Histórico de solicitações e artefatos de uma empresa.'},{property:'og:title',content:'Histórico da empresa — RDGen Automator'},{property:'og:description',content:'Histórico de solicitações e artefatos de uma empresa.'},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]}),component:CompanyDetail});

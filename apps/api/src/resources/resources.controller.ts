@@ -63,7 +63,7 @@ export class ResourcesController {
       this.pool.query(`SELECT id, name FROM rustdesk_servers ORDER BY name`),
       this.pool.query(`SELECT id, name, profile, version FROM presets ORDER BY profile, name, version`),
       this.pool.query(`SELECT id, name, company_name AS "companyName", theme FROM brandings ORDER BY name`),
-      this.pool.query(`SELECT id, name, server_id AS "serverId", branding_id AS "brandingId", preset_full_id AS "presetFullId", preset_qs_id AS "presetQsId" FROM companies ORDER BY name`)
+      this.pool.query(`SELECT id, name, server_id AS "serverId", branding_id AS "brandingId", preset_full_id AS "presetFullId", preset_qs_id AS "presetQsId", default_display_name AS "defaultDisplayName", default_technical_name AS "defaultTechnicalName" FROM companies ORDER BY name`)
     ]);
     return { servers: servers.rows, presets: presets.rows, brandings: brandings.rows, companies: companies.rows, releases: RDGEN_RELEASES };
   }
