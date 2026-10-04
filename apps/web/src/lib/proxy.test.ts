@@ -25,6 +25,16 @@ describe('same-origin backend proxy', () => {
     vi.unstubAllGlobals();
   });
 
+  it('forwards download-critical headers (content-disposition, content-length, nosniff)', async () => {
+    const fetchStub = vi.fn().mockResolvedValue(new Response('bytes', { status: 200, headers: { 'content-type': 'application/octet-stream', 'content-disposition': 'attachment; filename="client.exe"', 'content-length': '5', 'x-content-type-options': 'nosniff' } }));
+    vi.stubGlobal('fetch', fetchStub);
+    const response = await forwardBackendRequest(new Request('http://web.test/api/backend/public/companies/c1/download/a1'), '/public/companies/c1/download/a1', 'http://api.test:3001');
+    expect(response.headers.get('content-disposition')).toBe('attachment; filename="client.exe"');
+    expect(response.headers.get('content-length')).toBe('5');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    vi.unstubAllGlobals();
+  });
+
   it('forwards a body-less POST (e.g. logout) without disturbing the request stream', async () => {
     const fetchStub = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchStub);

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as AdminBrandingRouteImport } from './routes/admin/branding'
+import { Route as AdminCompaniesRouteImport } from './routes/admin/companies'
 import { Route as AdminGroupsRouteImport } from './routes/admin/groups'
 import { Route as AdminHealthRouteImport } from './routes/admin/health'
 import { Route as AdminPresetsRouteImport } from './routes/admin/presets'
@@ -20,6 +21,8 @@ import { Route as AdminRetentionRouteImport } from './routes/admin/retention'
 import { Route as AdminServersRouteImport } from './routes/admin/servers'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ClientesIndexRouteImport } from './routes/clientes.index'
+import { Route as ClientesIdRouteImport } from './routes/clientes.$id'
 import { Route as RequestsIndexRouteImport } from './routes/requests.index'
 import { Route as RequestsIdRouteImport } from './routes/requests.$id'
 import { Route as ApiBackendSplatRouteImport } from './routes/api/backend/$'
@@ -42,6 +45,11 @@ const NewRoute = NewRouteImport.update({
 const AdminBrandingRoute = AdminBrandingRouteImport.update({
   id: '/admin/branding',
   path: '/admin/branding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCompaniesRoute = AdminCompaniesRouteImport.update({
+  id: '/admin/companies',
+  path: '/admin/companies',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminGroupsRoute = AdminGroupsRouteImport.update({
@@ -79,6 +87,16 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientesIndexRoute = ClientesIndexRouteImport.update({
+  id: '/clientes/',
+  path: '/clientes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientesIdRoute = ClientesIdRouteImport.update({
+  id: '/clientes/$id',
+  path: '/clientes/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RequestsIndexRoute = RequestsIndexRouteImport.update({
   id: '/requests/',
   path: '/requests/',
@@ -100,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
+  '/admin/companies': typeof AdminCompaniesRoute
   '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
@@ -107,7 +126,9 @@ export interface FileRoutesByFullPath {
   '/admin/servers': typeof AdminServersRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/health': typeof ApiHealthRoute
+  '/clientes/$id': typeof ClientesIdRoute
   '/requests/$id': typeof RequestsIdRoute
+  '/clientes/': typeof ClientesIndexRoute
   '/requests/': typeof RequestsIndexRoute
   '/api/backend/$': typeof ApiBackendSplatRoute
 }
@@ -116,6 +137,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
+  '/admin/companies': typeof AdminCompaniesRoute
   '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
@@ -123,7 +145,9 @@ export interface FileRoutesByTo {
   '/admin/servers': typeof AdminServersRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/health': typeof ApiHealthRoute
+  '/clientes/$id': typeof ClientesIdRoute
   '/requests/$id': typeof RequestsIdRoute
+  '/clientes': typeof ClientesIndexRoute
   '/requests': typeof RequestsIndexRoute
   '/api/backend/$': typeof ApiBackendSplatRoute
 }
@@ -133,6 +157,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/new': typeof NewRoute
   '/admin/branding': typeof AdminBrandingRoute
+  '/admin/companies': typeof AdminCompaniesRoute
   '/admin/groups': typeof AdminGroupsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/presets': typeof AdminPresetsRoute
@@ -140,7 +165,9 @@ export interface FileRoutesById {
   '/admin/servers': typeof AdminServersRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/health': typeof ApiHealthRoute
+  '/clientes/$id': typeof ClientesIdRoute
   '/requests/$id': typeof RequestsIdRoute
+  '/clientes/': typeof ClientesIndexRoute
   '/requests/': typeof RequestsIndexRoute
   '/api/backend/$': typeof ApiBackendSplatRoute
 }
@@ -151,6 +178,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/new'
     | '/admin/branding'
+    | '/admin/companies'
     | '/admin/groups'
     | '/admin/health'
     | '/admin/presets'
@@ -158,7 +186,9 @@ export interface FileRouteTypes {
     | '/admin/servers'
     | '/admin/users'
     | '/api/health'
+    | '/clientes/$id'
     | '/requests/$id'
+    | '/clientes/'
     | '/requests/'
     | '/api/backend/$'
   fileRoutesByTo: FileRoutesByTo
@@ -167,6 +197,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/new'
     | '/admin/branding'
+    | '/admin/companies'
     | '/admin/groups'
     | '/admin/health'
     | '/admin/presets'
@@ -174,7 +205,9 @@ export interface FileRouteTypes {
     | '/admin/servers'
     | '/admin/users'
     | '/api/health'
+    | '/clientes/$id'
     | '/requests/$id'
+    | '/clientes'
     | '/requests'
     | '/api/backend/$'
   id:
@@ -183,6 +216,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/new'
     | '/admin/branding'
+    | '/admin/companies'
     | '/admin/groups'
     | '/admin/health'
     | '/admin/presets'
@@ -190,7 +224,9 @@ export interface FileRouteTypes {
     | '/admin/servers'
     | '/admin/users'
     | '/api/health'
+    | '/clientes/$id'
     | '/requests/$id'
+    | '/clientes/'
     | '/requests/'
     | '/api/backend/$'
   fileRoutesById: FileRoutesById
@@ -200,6 +236,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   NewRoute: typeof NewRoute
   AdminBrandingRoute: typeof AdminBrandingRoute
+  AdminCompaniesRoute: typeof AdminCompaniesRoute
   AdminGroupsRoute: typeof AdminGroupsRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminPresetsRoute: typeof AdminPresetsRoute
@@ -207,7 +244,9 @@ export interface RootRouteChildren {
   AdminServersRoute: typeof AdminServersRoute
   AdminUsersRoute: typeof AdminUsersRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ClientesIdRoute: typeof ClientesIdRoute
   RequestsIdRoute: typeof RequestsIdRoute
+  ClientesIndexRoute: typeof ClientesIndexRoute
   RequestsIndexRoute: typeof RequestsIndexRoute
   ApiBackendSplatRoute: typeof ApiBackendSplatRoute
 }
@@ -240,6 +279,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/branding'
       fullPath: '/admin/branding'
       preLoaderRoute: typeof AdminBrandingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/companies': {
+      id: '/admin/companies'
+      path: '/admin/companies'
+      fullPath: '/admin/companies'
+      preLoaderRoute: typeof AdminCompaniesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/groups': {
@@ -291,6 +337,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clientes/': {
+      id: '/clientes/'
+      path: '/clientes'
+      fullPath: '/clientes/'
+      preLoaderRoute: typeof ClientesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clientes/$id': {
+      id: '/clientes/$id'
+      path: '/clientes/$id'
+      fullPath: '/clientes/$id'
+      preLoaderRoute: typeof ClientesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/requests/': {
       id: '/requests/'
       path: '/requests'
@@ -320,6 +380,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   NewRoute: NewRoute,
   AdminBrandingRoute: AdminBrandingRoute,
+  AdminCompaniesRoute: AdminCompaniesRoute,
   AdminGroupsRoute: AdminGroupsRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminPresetsRoute: AdminPresetsRoute,
@@ -327,7 +388,9 @@ const rootRouteChildren: RootRouteChildren = {
   AdminServersRoute: AdminServersRoute,
   AdminUsersRoute: AdminUsersRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ClientesIdRoute: ClientesIdRoute,
   RequestsIdRoute: RequestsIdRoute,
+  ClientesIndexRoute: ClientesIndexRoute,
   RequestsIndexRoute: RequestsIndexRoute,
   ApiBackendSplatRoute: ApiBackendSplatRoute,
 }

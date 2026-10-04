@@ -32,6 +32,7 @@ export function NewRequest() {
   const [profiles, setProfiles] = useState<Profile[]>(['full']);
   const [presets, setPresets] = useState<Record<Profile, string | undefined>>({ full: data.presets.find(p => p.profile === 'full')?.id, qs: data.presets.find(p => p.profile === 'qs')?.id });
   const [brandingId, setBrandingId] = useState('');
+  const [companyId, setCompanyId] = useState('');
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [version, setVersion] = useState(data.releases.find(r => r !== 'nightly') || data.releases[0] || '');
   const [refreshing, setRefreshing] = useState(false);
@@ -43,6 +44,15 @@ export function NewRequest() {
   const [error, setError] = useState('');
   const [idempotencyKey, setIdempotencyKey] = useState('');
   const branding = data.brandings.find(b => b.id === brandingId);
+  function selectCompany(id: string) {
+    setCompanyId(id);
+    const company = data.companies.find(c => c.id === id);
+    if (company) {
+      setServerId(company.serverId);
+      setBrandingId(company.brandingId || '');
+      setPresets(prev => ({ full: company.presetFullId || prev.full, qs: company.presetQsId || prev.qs }));
+    }
+  }
   const both = profiles.length === 2;
   const jobs = profiles.length * platforms.length;
 
@@ -67,7 +77,7 @@ export function NewRequest() {
     setBusy(true);
     try {
       const finalImages: Images = { ...(branding?.images ?? {}), ...Object.fromEntries(Object.entries(images).filter(([, v]) => v)) };
-      const id = await repository.createRequest({ displayName: displayName.trim(), technicalName: technicalName.trim(), serverId, profiles, platforms, version, ...(brandingId ? { brandingId } : {}), images: finalImages, presetIds: Object.fromEntries(Object.entries(presets).filter(([k, v]) => v && profiles.includes(k as Profile))) as Partial<Record<Profile, string>>, password: !both || !separate ? password || undefined : undefined, profilePasswords: both && separate ? { full: password || undefined, qs: passwordQs || undefined } : undefined, idempotencyKey });
+      const id = await repository.createRequest({ displayName: displayName.trim(), technicalName: technicalName.trim(), serverId, profiles, platforms, version, ...(brandingId ? { brandingId } : {}), ...(companyId ? { companyId } : {}), images: finalImages, presetIds: Object.fromEntries(Object.entries(presets).filter(([k, v]) => v && profiles.includes(k as Profile))) as Partial<Record<Profile, string>>, password: !both || !separate ? password || undefined : undefined, profilePasswords: both && separate ? { full: password || undefined, qs: passwordQs || undefined } : undefined, idempotencyKey });
       setPassword(''); setPasswordQs('');
       toast.success(`${jobs} jobs criados`);
       navigate({ to: '/requests/$id', params: { id } });
@@ -86,6 +96,7 @@ export function NewRequest() {
         <div className="wizard-top"><span>ETAPA {String(step + 1).padStart(2, '0')} / 06</span><div className="step-track"><i style={{ width: `${((step + 1) / 6) * 100}%` }} /></div></div>
 
         {step === 0 && <section className="wizard-section"><div className="section-kicker">01 / GERAL & SERVIDOR</div><h2>Identidade do cliente</h2><p>Defina como o aplicativo será apresentado e a qual servidor irá se conectar.</p>
+          {data.companies.length > 0 && <div className="preset-choice" style={{ marginTop: 0 }}><div className="mini-heading">EMPRESA / OPCIONAL</div><select value={companyId} onChange={e => selectCompany(e.target.value)}><option value="">Nenhuma — configurar manualmente</option>{data.companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><small>Selecionar uma empresa preenche servidor, branding e presets automaticamente.</small><div className="form-divider" /></div>}
           <div className="form-grid"><label>Nome exibido *<input value={displayName} maxLength={80} placeholder="Ex.: Acme Support" onChange={e => setDisplayName(e.target.value)} /></label><label>Nome técnico do executável *<input value={technicalName} maxLength={80} placeholder="Ex.: acme-support" onChange={e => setTechnicalName(e.target.value)} /></label></div>
           <div className="form-divider" /><h3>Servidor RustDesk</h3>
           {data.servers.length === 0 ? <div className="hint"><Info size={16} /> Nenhum servidor configurado. <Link to="/admin/servers">Clique aqui para definir.</Link></div> : <div className="option-grid">{data.servers.map(s => <Button key={s.id} variant="ghost" className={`option-card ${serverId === s.id ? 'chosen' : ''}`} onClick={() => setServerId(s.id)}><span className="option-radio" /><span><strong>{s.name}</strong><small>{s.host}:{s.port}</small></span></Button>)}</div>}

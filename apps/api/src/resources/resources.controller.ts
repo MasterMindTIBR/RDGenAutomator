@@ -13,7 +13,7 @@ type RequestLike = { headers: Record<string, string | string[] | undefined> };
 type ResponseLike = { setHeader(name: string, value: string): void; end(value?: Buffer): void; once(event: 'close' | 'finish', listener: () => void): void };
 function cookie(request: RequestLike): string | undefined { const value = request.headers.cookie; return Array.isArray(value) ? value[0] : value; }
 
-type RequestRow = { id: string; creatorId: string; visibility: 'private' | 'published'; displayName: string; technicalName: string; createdAt: Date; updatedAt: Date };
+type RequestRow = { id: string; creatorId: string; visibility: 'private' | 'published'; displayName: string; technicalName: string; companyId: string | null; createdAt: Date; updatedAt: Date };
 type ArtifactRow = { id: string; requestId: string; creatorId: string; visibility: 'private' | 'published'; storageKey: string; filename: string | null; contentType: string; bytes: string; sha256: string };
 
 @Controller()
@@ -42,7 +42,7 @@ export class ResourcesController {
   async listRequests(@Req() request: RequestLike) {
     const actor = await this.sessions.authenticate(cookie(request));
     const result = await this.pool.query(
-      `SELECT id, visibility, display_name AS "displayName", technical_name AS "technicalName", created_at AS "createdAt", updated_at AS "updatedAt"
+      `SELECT id, visibility, display_name AS "displayName", technical_name AS "technicalName", company_id AS "companyId", created_at AS "createdAt", updated_at AS "updatedAt"
        FROM build_requests
        WHERE $1 = 'administrator' OR creator_id = $2 OR (
          visibility = 'published' AND (
@@ -59,12 +59,13 @@ export class ResourcesController {
   @Get('build-requests/options')
   async requestOptions(@Req() request: RequestLike) {
     await this.sessions.authenticate(cookie(request));
-    const [servers, presets, brandings] = await Promise.all([
+    const [servers, presets, brandings, companies] = await Promise.all([
       this.pool.query(`SELECT id, name FROM rustdesk_servers ORDER BY name`),
       this.pool.query(`SELECT id, name, profile, version FROM presets ORDER BY profile, name, version`),
-      this.pool.query(`SELECT id, name, company_name AS "companyName", theme FROM brandings ORDER BY name`)
+      this.pool.query(`SELECT id, name, company_name AS "companyName", theme FROM brandings ORDER BY name`),
+      this.pool.query(`SELECT id, name, server_id AS "serverId", branding_id AS "brandingId", preset_full_id AS "presetFullId", preset_qs_id AS "presetQsId" FROM companies ORDER BY name`)
     ]);
-    return { servers: servers.rows, presets: presets.rows, brandings: brandings.rows, releases: RDGEN_RELEASES };
+    return { servers: servers.rows, presets: presets.rows, brandings: brandings.rows, companies: companies.rows, releases: RDGEN_RELEASES };
   }
 
   @Post('build-requests/releases/refresh')
@@ -77,7 +78,7 @@ export class ResourcesController {
   async requestById(@Param('id') id: string, @Req() request: RequestLike) {
     const actor = await this.sessions.authenticate(cookie(request));
     const result = await this.pool.query<RequestRow>(
-      `SELECT id, creator_id AS "creatorId", visibility, display_name AS "displayName", technical_name AS "technicalName", created_at AS "createdAt", updated_at AS "updatedAt"
+      `SELECT id, creator_id AS "creatorId", visibility, display_name AS "displayName", technical_name AS "technicalName", company_id AS "companyId", created_at AS "createdAt", updated_at AS "updatedAt"
        FROM build_requests WHERE id = $1`, [id]
     );
     const resource = result.rows[0];
@@ -90,7 +91,7 @@ export class ResourcesController {
         FROM build_jobs j WHERE j.request_id = $1 ORDER BY j.created_at`, [id]),
       this.pool.query(`SELECT a.id, a.sha256, a.bytes, a.content_type AS "contentType", a.created_at AS "createdAt" FROM artifacts a JOIN build_jobs j ON j.id = a.job_id WHERE j.request_id = $1 ORDER BY a.created_at`, [id])
     ]);
-    return { request: { id: resource.id, visibility: resource.visibility, displayName: resource.displayName, technicalName: resource.technicalName, createdAt: resource.createdAt, updatedAt: resource.updatedAt, canManage: actor.role === 'administrator' || resource.creatorId === actor.userId }, jobs: jobs.rows, artifacts: artifacts.rows };
+    return { request: { id: resource.id, visibility: resource.visibility, displayName: resource.displayName, technicalName: resource.technicalName, companyId: resource.companyId, createdAt: resource.createdAt, updatedAt: resource.updatedAt, canManage: actor.role === 'administrator' || resource.creatorId === actor.userId }, jobs: jobs.rows, artifacts: artifacts.rows };
   }
 
   @Post('build-requests/:id/visibility')

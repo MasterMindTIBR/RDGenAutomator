@@ -11,6 +11,8 @@ import { AdminUsersController } from './admin/users.controller.js';
 import { ResourcesController } from './resources/resources.controller.js';
 import { AdminConfigurationController } from './admin/configuration.controller.js';
 import { GroupsController } from './admin/groups.controller.js';
+import { CompaniesController } from './admin/companies.controller.js';
+import { PublicController } from './public/public.controller.js';
 import { RequestsController } from './requests/requests.controller.js';
 import { RequestsService } from './requests/requests.service.js';
 import { JobsController } from './jobs/jobs.controller.js';
@@ -26,7 +28,7 @@ export function createAppModule(environment: AppEnvironment, pool: Pool, redis: 
     check() { return health.check(); }
   }
   @Module({
-    controllers: [HealthController, AuthController, AdminUsersController, AdminConfigurationController, GroupsController, RequestsController, ResourcesController, JobsController],
+    controllers: [HealthController, AuthController, AdminUsersController, AdminConfigurationController, GroupsController, CompaniesController, PublicController, RequestsController, ResourcesController, JobsController],
     providers: [
       { provide: 'DATABASE_POOL', useValue: pool },
       { provide: 'APP_ENVIRONMENT', useValue: environment },

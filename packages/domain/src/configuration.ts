@@ -46,7 +46,7 @@ export const buildRequestInputSchema = z.object({
   technicalName: safeName.regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'Technical name may contain only letters, digits, dot, underscore and hyphen.'),
   permanentPassword: z.string().max(1024).optional(),
   profilePasswords: z.object({ full: z.string().max(1024).optional(), qs: z.string().max(1024).optional() }).strict().optional(),
-  serverId: z.string().uuid(), brandingId: z.string().uuid().optional(),
+  serverId: z.string().uuid(), brandingId: z.string().uuid().optional(), companyId: z.string().uuid().optional(),
   presets: z.object({ full: z.string().uuid().optional(), qs: z.string().uuid().optional() }).strict(),
   profiles: z.array(profileSchema).min(1).max(2).superRefine((values, context) => unique(values, context, 'Profiles must be unique.')),
   platforms: z.array(platformSchema).min(1).max(5).superRefine((values, context) => unique(values, context, 'Platforms must be unique.')),
@@ -54,6 +54,14 @@ export const buildRequestInputSchema = z.object({
   images: z.object({ icon: pngUploadSchema.optional(), logo: pngUploadSchema.optional(), privacyScreen: pngUploadSchema.optional() }).strict().optional()
 }).strict().superRefine((value, context) => { for (const profile of value.profiles) if (!value.presets[profile]) context.addIssue({ code: z.ZodIssueCode.custom, path: ['presets', profile], message: `A ${profile} preset is required.` }); });
 export type BuildRequestInput = z.infer<typeof buildRequestInputSchema>;
+
+/** A company bundles the defaults for one client's builds: which server/branding/presets to pre-select, and which past request is exposed on the public download page. */
+export const companyAdminInputSchema = z.object({
+  name: safeName, serverId: z.string().uuid(),
+  brandingId: z.string().uuid().optional(), presetFullId: z.string().uuid().optional(), presetQsId: z.string().uuid().optional(),
+  isPublic: z.boolean(), publicRequestId: z.string().uuid().optional()
+}).strict();
+export type CompanyAdminInput = z.infer<typeof companyAdminInputSchema>;
 
 export type ResolvedJobConfiguration = {
   version: string; platform: Platform; exename: string; appname: string; compname?: string;

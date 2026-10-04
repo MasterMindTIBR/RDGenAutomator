@@ -10,7 +10,7 @@ export async function forwardBackendRequest(request: Request, path: string, apiB
   const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer();
   const upstream = await fetch(backendRequest(request, apiBaseUrl, path, body));
   if (upstream.status >= 300 && upstream.status < 400) return new Response('Unexpected redirect from API.', { status: 502, headers: { 'cache-control': 'private, no-store' } });
-  const headers = new Headers({ 'cache-control': 'private, no-store' }); const contentType = upstream.headers.get('content-type'); if (contentType) headers.set('content-type', contentType);
+  const headers = new Headers({ 'cache-control': 'private, no-store' }); for (const name of ['content-type', 'content-disposition', 'content-length', 'x-content-type-options'] as const) { const value = upstream.headers.get(name); if (value) headers.set(name, value); }
   const cookies = (upstream.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? (upstream.headers.get('set-cookie') ? [upstream.headers.get('set-cookie')!] : []); for (const cookie of cookies) headers.append('set-cookie', cookie);
   return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers });
 }

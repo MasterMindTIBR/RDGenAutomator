@@ -29,14 +29,14 @@ export class RequestsService {
       const server = await this.server(client, input.serverId); const presets = await this.presets(client, input); const branding = await this.branding(client, input.brandingId);
       const retention = await client.query<{ days: number }>('SELECT logo_retention_days AS days FROM system_settings WHERE id = true'); const retentionDays = retention.rows[0]?.days ?? 30;
       const requestImages = this.storageImages(uploaded); const requestId = (await client.query<{ id: string }>(
-        `INSERT INTO build_requests (creator_id, display_name, technical_name, idempotency_key, server_id, branding_id,
+        `INSERT INTO build_requests (creator_id, display_name, technical_name, idempotency_key, server_id, branding_id, company_id,
           icon_storage_key, icon_content_type, icon_bytes, icon_width, icon_height, icon_retention_expires_at,
           logo_storage_key, logo_content_type, logo_bytes, logo_width, logo_height, logo_retention_expires_at,
           privacy_storage_key, privacy_content_type, privacy_bytes, privacy_width, privacy_height, privacy_retention_expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $7::text IS NULL THEN NULL ELSE now() + ($12 * interval '1 day') END,
-          $13, $14, $15, $16, $17, CASE WHEN $13::text IS NULL THEN NULL ELSE now() + ($12 * interval '1 day') END,
-          $18, $19, $20, $21, $22, CASE WHEN $18::text IS NULL THEN NULL ELSE now() + ($12 * interval '1 day') END) RETURNING id`,
-        [actorId, input.displayName, input.technicalName, idempotencyKey, server.id, branding?.id ?? null,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CASE WHEN $8::text IS NULL THEN NULL ELSE now() + ($13 * interval '1 day') END,
+          $14, $15, $16, $17, $18, CASE WHEN $14::text IS NULL THEN NULL ELSE now() + ($13 * interval '1 day') END,
+          $19, $20, $21, $22, $23, CASE WHEN $19::text IS NULL THEN NULL ELSE now() + ($13 * interval '1 day') END) RETURNING id`,
+        [actorId, input.displayName, input.technicalName, idempotencyKey, server.id, branding?.id ?? null, input.companyId ?? null,
           requestImages.icon?.storageKey ?? null, requestImages.icon ? 'image/png' : null, requestImages.icon?.bytes.byteLength ?? null, requestImages.icon?.width ?? null, requestImages.icon?.height ?? null, retentionDays,
           requestImages.logo?.storageKey ?? null, requestImages.logo ? 'image/png' : null, requestImages.logo?.bytes.byteLength ?? null, requestImages.logo?.width ?? null, requestImages.logo?.height ?? null,
           requestImages.privacyScreen?.storageKey ?? null, requestImages.privacyScreen ? 'image/png' : null, requestImages.privacyScreen?.bytes.byteLength ?? null, requestImages.privacyScreen?.width ?? null, requestImages.privacyScreen?.height ?? null]
