@@ -32,7 +32,7 @@ export class JobsService {
       if (job.status === 'início_indeterminado' && !riskConfirmed) throw new BadRequestException('Retrying an indeterminate start requires explicit duplicate-build risk confirmation.');
       if (job.manualRetryAfter && job.manualRetryAfter > new Date()) throw new BadRequestException('Manual retry is in cooldown.');
       if (job.status === 'início_indeterminado') await client.query(`UPDATE build_attempts SET risk_confirmed_at = now() WHERE job_id = $1 AND status = 'início_indeterminado' AND risk_confirmed_at IS NULL`, [jobId]);
-      await client.query(`UPDATE build_jobs SET status = 'aguardando_retry', manual_retry_after = now() + ($2 * interval '1 millisecond'), next_retry_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1`, [jobId, manualCooldownMs]);
+      await client.query(`UPDATE build_jobs SET status = 'aguardando_retry', manual_retry_after = now() + ($2 * interval '1 millisecond'), next_retry_at = now(), last_error_code = NULL, consecutive_workflow_infrastructure_failures = 0, updated_at = now() WHERE id = $1`, [jobId, manualCooldownMs]);
       await this.outbox(client, jobId, 'manual-retry');
       await new AuditService(client).record(actor.userId, 'build_job.manual_retry_authorized', 'build_job', jobId, { riskConfirmed });
       await client.query('COMMIT'); return { queued: true };

@@ -1,0 +1,12 @@
+services:
+  postgres:
+    network_mode: bridge
+    ports: !override ["127.0.0.1:55433:5432"]
+    volumes: !override []
+  redis:
+    network_mode: bridge
+    ports: !override ["127.0.0.1:6380:6379"]
+    volumes: !override []
+# This workstation's docker daemon has no free address pools, so the integration
+# stack attaches both services to the host bridge instead of provisioning a
+# per-project network; tests reach them through the published localhost ports.

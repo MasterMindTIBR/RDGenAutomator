@@ -2,18 +2,20 @@ import { rm } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
+import { sweepTerminalActionSnapshots } from './action-telemetry-store.js';
 
 type Stored = { id: string; storageKey: string };
 /** One DB lease serializes sweeps; per-artifact tombstones make a claimed download win over expiry. */
 export class RetentionService {
   private readonly owner = `retention-${randomUUID()}`; private readonly root: string;
   constructor(private readonly pool: Pool, storagePath: string) { this.root = resolve(storagePath); }
-  async run(limit = 100): Promise<{ artifacts: number; logos: number; skipped: boolean }> {
+  async run(limit = 100): Promise<{ artifacts: number; logos: number; actionSnapshots: number; skipped: boolean }> {
     const claimed = await this.pool.query(`UPDATE retention_leases SET owner = $1, expires_at = now() + interval '5 minutes', updated_at = now() WHERE name = 'persistent-storage' AND (expires_at IS NULL OR expires_at < now() OR owner = $1) RETURNING name`, [this.owner]);
-    if (!claimed.rowCount) return { artifacts: 0, logos: 0, skipped: true };
+    if (!claimed.rowCount) return { artifacts: 0, logos: 0, actionSnapshots: 0, skipped: true };
     try {
       const artifacts = await this.tombstoneArtifacts(limit); const logos = await this.tombstoneRequestImages(limit);
-      return { artifacts, logos, skipped: false };
+      const actionSnapshots = await sweepTerminalActionSnapshots(this.pool);
+      return { artifacts, logos, actionSnapshots, skipped: false };
     } finally { await this.pool.query(`UPDATE retention_leases SET owner = NULL, expires_at = NULL, updated_at = now() WHERE name = 'persistent-storage' AND owner = $1`, [this.owner]); }
   }
   private safePath(key: string, prefix: string): string {

@@ -10,7 +10,7 @@ type ServerRow = ProtectedValue & { id: string; name: string; keyId: string };
 type PresetRow = { id: string; profile: Profile; configuration: unknown };
 type BrandingRow = { id: string; name: string; companyName: string; androidApplicationId: string | null; theme: 'light' | 'dark' | 'system'; themeScope: 'default' | 'override'; iconStorageKey: string | null; logoStorageKey: string | null; privacyStorageKey: string | null };
 type StoredImage = { bytes: Buffer; width: number; height: number; storageKey: string };
-type PublicRequest = { id: string; visibility: 'private' | 'published'; displayName: string; technicalName: string; createdAt: Date; updatedAt: Date };
+export type PublicRequest = { id: string; visibility: 'private' | 'published'; displayName: string; technicalName: string; createdAt: Date; updatedAt: Date };
 
 @Injectable()
 export class RequestsService {
@@ -90,7 +90,16 @@ export class RequestsService {
     return byProfile;
   }
   private async present(client: PoolClient, id: string): Promise<{ request: PublicRequest; jobs: Array<Record<string, unknown>> }> {
-    const request = await client.query<PublicRequest>(`SELECT id, visibility, display_name AS "displayName", technical_name AS "technicalName", created_at AS "createdAt", updated_at AS "updatedAt" FROM build_requests WHERE id = $1`, [id]);
-    const jobs = await client.query(`SELECT id, profile, platform, version, status, created_at AS "createdAt", updated_at AS "updatedAt" FROM build_jobs WHERE request_id = $1 ORDER BY created_at, profile`, [id]); return { request: request.rows[0], jobs: jobs.rows };
+    return presentRequestWithJobs(client, id);
   }
+}
+/** Safe projection shared by the service and integration tests: telemetry only, capability URLs stay in JobsService.externalLinks. */
+export async function presentRequestWithJobs(client: PoolClient, id: string): Promise<{ request: PublicRequest; jobs: Array<Record<string, unknown>> }> {
+  const request = await client.query<PublicRequest>(`SELECT id, visibility, display_name AS "displayName", technical_name AS "technicalName", created_at AS "createdAt", updated_at AS "updatedAt" FROM build_requests WHERE id = $1`, [id]);
+  const jobs = await client.query(
+    `SELECT j.id, j.profile, j.platform, j.version, j.status, j.created_at AS "createdAt", j.updated_at AS "updatedAt", telemetry.action_telemetry AS "actionTelemetry"
+     FROM build_jobs j
+     LEFT JOIN LATERAL (SELECT a.action_telemetry FROM build_attempts a WHERE a.job_id = j.id ORDER BY a.active DESC, a.attempt_number DESC LIMIT 1) telemetry ON true
+     WHERE j.request_id = $1 ORDER BY j.created_at, j.profile`, [id]);
+  return { request: request.rows[0], jobs: jobs.rows };
 }

@@ -7,4 +7,5 @@ export * from './releases.js';
 export * from './png.js';
 export * from './lifecycle.js';
 export * from './rdgen-provider.js';
+export * from './action-telemetry.js';
 export * from './artifacts.js';

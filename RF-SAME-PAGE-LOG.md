@@ -144,3 +144,6 @@ VERDICT: NOT YET
 ### Visionary disposition
 - ACCEPTED (user-approved at the cap gate): standalone `pnpm db:migrate` removed from every proof command; the Rock 1 integration runner owns local dependency startup, migrations, test execution, and teardown.
 - VERDICT: SAME PAGE by explicit user override at the five-round cap (2026-10-04); Rock 1 build authorized.
+
+### Build handoff note (2026-10-04)
+- Codex workspace hit its credit limit at Rock 1 launch (thread 01a1084f-93b6-7431-bf97-01e4bf509824, `turn.failed`). The user authorized the Visionary to implement Rock 1 directly during the ~4h outage; Codex resumes for later rocks and fix rounds. Deviation recorded per the Accountability Chart takeover rule.
