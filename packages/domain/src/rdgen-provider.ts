@@ -48,10 +48,10 @@ export class RdgenProvider {
   }
   private readonly fetch: FetchLike;
   private readonly allowedOrigins: Set<string>;
-  async startBuild(configuration: ResolvedJobConfiguration): Promise<RemoteBuild> {
+  async startBuild(configuration: ResolvedJobConfiguration, images: { icon?: Buffer; logo?: Buffer; privacyScreen?: Buffer } = {}): Promise<RemoteBuild> {
     let response: Response;
     try {
-      response = await this.fetch(`${this.baseUrl}/generator`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: this.form(configuration), redirect: 'error' });
+      response = await this.fetch(`${this.baseUrl}/generator`, { method: 'POST', body: this.form(configuration, images), redirect: 'error' });
     } catch { throw new RdgenAmbiguousStartError('RDGen start response was not received'); }
     if (response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500) throw new RdgenTransientError(`RDGen start returned HTTP ${response.status}`);
     if (!response.ok) throw new RdgenTerminalError(`RDGen start rejected with HTTP ${response.status}`);
@@ -108,9 +108,17 @@ export class RdgenProvider {
     if (url.protocol !== 'https:' || !this.allowedOrigins.has(url.origin)) throw new RdgenProtocolError('RDGen artifact URL is off the allowlist');
     return url.toString();
   }
-  private form(configuration: ResolvedJobConfiguration): string {
-    // RDGen's documented HTML form fields; secrets stay only in the HTTP body.
-    const data: Record<string, string> = { ...Object.fromEntries(Object.entries(configuration).filter(([, value]) => typeof value === 'string').map(([key, value]) => [key, String(value)])), custom: JSON.stringify(configuration.custom) };
-    return Object.entries(data).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&');
+  private form(configuration: ResolvedJobConfiguration, images: { icon?: Buffer; logo?: Buffer; privacyScreen?: Buffer }): FormData {
+    // RDGen's live /generator view is a flat Django form: text/select fields by name, checkboxes present only when true, images as real file uploads.
+    const { iconStorageKey, logoStorageKey, privacyStorageKey, ...fields } = configuration;
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) {
+      if (typeof value === 'string') form.append(key, value);
+      else if (typeof value === 'boolean') { if (value) form.append(key, 'on'); }
+    }
+    if (images.icon) form.append('iconfile', new File([images.icon], 'icon.png', { type: 'image/png' }));
+    if (images.logo) form.append('logofile', new File([images.logo], 'logo.png', { type: 'image/png' }));
+    if (images.privacyScreen) form.append('privacyfile', new File([images.privacyScreen], 'privacy.png', { type: 'image/png' }));
+    return form;
   }
 }

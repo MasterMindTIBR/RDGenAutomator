@@ -55,22 +55,55 @@ export const buildRequestInputSchema = z.object({
 }).strict().superRefine((value, context) => { for (const profile of value.profiles) if (!value.presets[profile]) context.addIssue({ code: z.ZodIssueCode.custom, path: ['presets', profile], message: `A ${profile} preset is required.` }); });
 export type BuildRequestInput = z.infer<typeof buildRequestInputSchema>;
 
-export type ResolvedJobConfiguration = { version: string; platform: Platform; exename: string; appname: string; compname?: string; serverIP: string; serverPort?: string; key: string; apiServer?: string; urlLink?: string; downloadLink?: string; permanentPassword: string; iconStorageKey?: string; logoStorageKey?: string; privacyStorageKey?: string; custom: Record<string, unknown>; };
-const yn = (value: boolean) => value ? 'Y' : 'N';
+export type ResolvedJobConfiguration = {
+  version: string; platform: Platform; exename: string; appname: string; compname?: string;
+  serverIP?: string; serverPort?: string; key?: string; apiServer?: string; urlLink?: string; downloadLink?: string;
+  androidAppId?: string; permanentPassword: string;
+  direction: 'incoming' | 'outgoing' | 'both';
+  installation: 'installationY' | 'installationN';
+  settings: 'settingsY' | 'settingsN';
+  passApproveMode: 'password' | 'click' | 'password-click';
+  theme: 'light' | 'dark' | 'system';
+  themeDorO: 'default' | 'override';
+  permissionsDorO: 'override'; permissionsType: 'custom';
+  enableKeyboard: boolean; enableClipboard: boolean; enableFileTransfer: boolean; enableAudio: boolean; enableTCP: boolean;
+  enableRemoteRestart: boolean; enableRecording: boolean; enableBlockingInput: boolean; enableRemoteModi: boolean;
+  enablePrinter: boolean; enableCamera: boolean; enableTerminal: boolean;
+  denyLan: boolean; enableDirectIP: boolean; autoClose: boolean; hidecm: boolean; xOffline: boolean;
+  removeNewVersionNotif: boolean; removeWallpaper: boolean;
+  iconStorageKey?: string; logoStorageKey?: string; privacyStorageKey?: string;
+};
 
-/** Composes one backend-only RDGen configuration for exactly one job. */
+/** Composes one backend-only RDGen configuration for exactly one job. Field names match RDGen's live /generator form exactly: it is a flat Django form, not a JSON-blob API. */
 export function composeResolvedJobConfiguration(input: { request: Pick<BuildRequestInput, 'displayName' | 'technicalName' | 'permanentPassword' | 'profilePasswords'>; platform: Platform; version: string; password: string; server: RustDeskServerConfiguration; preset: PresetConfiguration; branding?: BrandingConfiguration; iconStorageKey?: string; logoStorageKey?: string; privacyStorageKey?: string; }): { resolved: ResolvedJobConfiguration; redacted: Record<string, unknown> } {
   const { request, platform, version, password, server, preset, branding, iconStorageKey, logoStorageKey, privacyStorageKey } = input;
-  const permissions = { 'access-mode': 'custom', 'enable-keyboard': yn(preset.permissions.keyboard), 'enable-clipboard': yn(preset.permissions.clipboard), 'enable-file-transfer': yn(preset.permissions.fileTransfer), 'enable-audio': yn(preset.permissions.audio), 'enable-tunnel': yn(preset.permissions.tunnel), 'enable-remote-restart': yn(preset.permissions.remoteRestart), 'enable-record-session': yn(preset.permissions.recording), 'enable-block-input': yn(preset.permissions.blockInput), 'allow-remote-config-modification': yn(preset.permissions.remoteConfigModification), 'enable-remote-printer': yn(preset.permissions.printer), 'enable-camera': yn(preset.permissions.camera), 'enable-terminal': yn(preset.permissions.terminal), 'direct-server': yn(preset.enableDirectIp), 'verification-method': preset.hideConnectionManager ? 'use-permanent-password' : 'use-both-passwords', 'approve-mode': preset.approvalMode, 'allow-hide-cm': yn(preset.hideConnectionManager), 'allow-remove-wallpaper': yn(preset.removeWallpaper) };
-  const custom: Record<string, unknown> = { 'override-settings': {}, 'default-settings': {}, 'conn-type': preset.direction, 'enable-lan-discovery': yn(!preset.denyLanDiscovery), 'allow-auto-disconnect': yn(preset.autoDisconnect), 'offline-mode': yn(preset.offlineMode), 'remove-new-version-notification': yn(preset.suppressNewVersionNotification) };
-  if (!preset.installationEnabled) custom['disable-installation'] = 'Y';
-  if (!preset.settingsEnabled) custom['disable-settings'] = 'Y';
-  if (branding && branding.theme !== 'system') {
-    const theme = platform === 'windows-x86' ? { 'allow-darktheme': yn(branding.theme === 'dark') } : { theme: branding.theme };
-    custom[branding.themeScope === 'default' ? 'default-settings' : 'override-settings'] = theme;
-  }
-  Object.assign(custom['override-settings'] as Record<string, unknown>, permissions);
-  if (preset.direction === 'incoming') { (custom['override-settings'] as Record<string, unknown>)['custom-rendezvous-server'] = server.host; if (server.apiServer) (custom['override-settings'] as Record<string, unknown>)['api-server'] = server.apiServer; }
-  const resolved: ResolvedJobConfiguration = { version, platform, exename: request.technicalName, appname: request.displayName, ...(branding ? { compname: branding.companyName } : {}), serverIP: server.host, ...(server.port ? { serverPort: server.port } : {}), key: server.publicKey, ...(server.apiServer ? { apiServer: server.apiServer } : {}), ...(server.linkUrl ? { urlLink: server.linkUrl } : {}), ...(server.downloadUrl ? { downloadLink: server.downloadUrl } : {}), permanentPassword: password, ...(iconStorageKey ? { iconStorageKey } : {}), ...(logoStorageKey ? { logoStorageKey } : {}), ...(privacyStorageKey ? { privacyStorageKey } : {}), custom };
-  return { resolved, redacted: { version, platform, exename: request.technicalName, appname: request.displayName, ...(branding ? { compname: branding.companyName } : {}), server: '[redacted]', permanentPassword: '[redacted]', images: { icon: Boolean(iconStorageKey), logo: Boolean(logoStorageKey), privacyScreen: Boolean(privacyStorageKey) }, custom } };
+  const resolved: ResolvedJobConfiguration = {
+    version, platform, exename: request.technicalName, appname: request.displayName,
+    ...(branding ? { compname: branding.companyName } : {}),
+    serverIP: server.host, ...(server.port ? { serverPort: server.port } : {}), key: server.publicKey,
+    ...(server.apiServer ? { apiServer: server.apiServer } : {}), ...(server.linkUrl ? { urlLink: server.linkUrl } : {}), ...(server.downloadUrl ? { downloadLink: server.downloadUrl } : {}),
+    ...(branding?.androidApplicationId ? { androidAppId: branding.androidApplicationId } : {}),
+    permanentPassword: password,
+    direction: preset.direction,
+    installation: preset.installationEnabled ? 'installationY' : 'installationN',
+    settings: preset.settingsEnabled ? 'settingsY' : 'settingsN',
+    passApproveMode: preset.approvalMode,
+    theme: branding?.theme ?? 'system',
+    themeDorO: branding?.themeScope ?? 'default',
+    permissionsDorO: 'override', permissionsType: 'custom',
+    enableKeyboard: preset.permissions.keyboard, enableClipboard: preset.permissions.clipboard, enableFileTransfer: preset.permissions.fileTransfer,
+    enableAudio: preset.permissions.audio, enableTCP: preset.permissions.tunnel, enableRemoteRestart: preset.permissions.remoteRestart,
+    enableRecording: preset.permissions.recording, enableBlockingInput: preset.permissions.blockInput, enableRemoteModi: preset.permissions.remoteConfigModification,
+    enablePrinter: preset.permissions.printer, enableCamera: preset.permissions.camera, enableTerminal: preset.permissions.terminal,
+    denyLan: preset.denyLanDiscovery, enableDirectIP: preset.enableDirectIp, autoClose: preset.autoDisconnect, hidecm: preset.hideConnectionManager,
+    xOffline: preset.offlineMode, removeNewVersionNotif: preset.suppressNewVersionNotification, removeWallpaper: preset.removeWallpaper,
+    ...(iconStorageKey ? { iconStorageKey } : {}), ...(logoStorageKey ? { logoStorageKey } : {}), ...(privacyStorageKey ? { privacyStorageKey } : {})
+  };
+  const redacted = {
+    version, platform, exename: request.technicalName, appname: request.displayName, ...(branding ? { compname: branding.companyName } : {}),
+    server: '[redacted]', permanentPassword: '[redacted]',
+    images: { icon: Boolean(iconStorageKey), logo: Boolean(logoStorageKey), privacyScreen: Boolean(privacyStorageKey) },
+    direction: preset.direction, passApproveMode: preset.approvalMode, permissions: preset.permissions
+  };
+  return { resolved, redacted };
 }

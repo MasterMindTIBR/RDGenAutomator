@@ -18,10 +18,12 @@ test('composition keeps secrets only in the resolved configuration and maps type
   });
   assert.equal(result.resolved.permanentPassword, 'permanent-secret');
   assert.equal(result.resolved.key, 'server-public-key');
-  assert.equal(result.resolved.custom['disable-installation'], 'Y');
-  assert.equal((result.resolved.custom['override-settings'] as Record<string, string>)['approve-mode'], 'password');
-  assert.equal((result.resolved.custom['override-settings'] as Record<string, string>)['access-mode'], 'custom');
-  assert.equal((result.resolved.custom['override-settings'] as Record<string, string>)['custom-rendezvous-server'], 'relay.example.invalid');
+  assert.equal(result.resolved.installation, 'installationN');
+  assert.equal(result.resolved.settings, 'settingsN');
+  assert.equal(result.resolved.passApproveMode, 'password');
+  assert.equal(result.resolved.permissionsType, 'custom');
+  assert.equal(result.resolved.permissionsDorO, 'override');
+  assert.equal(result.resolved.serverIP, 'relay.example.invalid');
   assert.equal(JSON.stringify(result.redacted).includes('permanent-secret'), false);
   assert.equal(JSON.stringify(result.redacted).includes('server-public-key'), false);
 });
@@ -35,10 +37,8 @@ test('composition without branding emits no theme override or company name', () 
     });
   });
   assert(result);
-  const override = result.resolved.custom['override-settings'] as Record<string, unknown>;
-  const defaults = result.resolved.custom['default-settings'] as Record<string, unknown>;
-  assert.equal('theme' in override, false); assert.equal('allow-darktheme' in override, false);
-  assert.equal('theme' in defaults, false); assert.equal('allow-darktheme' in defaults, false);
+  assert.equal(result.resolved.theme, 'system');
+  assert.equal(result.resolved.themeDorO, 'default');
   assert.equal('compname' in result.resolved, false);
 });
 

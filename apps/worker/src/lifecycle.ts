@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { Queue } from 'bullmq';
 import type { Pool, PoolClient } from 'pg';
 import { EncryptionService, RdgenAmbiguousStartError, RdgenProvider, RdgenTerminalError, RdgenTransientError, retryDelayMs, sweepTemporaryConfigurations, type ProtectedValue, type RemoteBuild, type ResolvedJobConfiguration } from '@rdgen/domain';
@@ -107,8 +109,15 @@ export class RdgenJobRunner {
     if (elapsed < this.startGapMs) { const { promise, resolve } = Promise.withResolvers<void>(); setTimeout(resolve, this.startGapMs - elapsed); await promise; }
     this.lastStartAt = Date.now();
   }
+  private async loadImages(configuration: ResolvedJobConfiguration): Promise<{ icon?: Buffer; logo?: Buffer; privacyScreen?: Buffer }> {
+    if (!this.storagePath) return {};
+    const root = this.storagePath;
+    const read = async (key?: string) => key ? readFile(join(root, key)).catch(() => undefined) : undefined;
+    const [icon, logo, privacyScreen] = await Promise.all([read(configuration.iconStorageKey), read(configuration.logoStorageKey), read(configuration.privacyStorageKey)]);
+    return { ...(icon ? { icon } : {}), ...(logo ? { logo } : {}), ...(privacyScreen ? { privacyScreen } : {}) };
+  }
   private async start(claim: ClaimedStart): Promise<void> {
-    try { await this.throttleStart(); await this.persistRemote(claim, await this.provider.startBuild(claim.configuration)); }
+    try { await this.throttleStart(); const images = await this.loadImages(claim.configuration); await this.persistRemote(claim, await this.provider.startBuild(claim.configuration, images)); }
     catch (error) {
       if (error instanceof RdgenAmbiguousStartError) return this.indeterminate(claim, error);
       if (error instanceof RdgenTransientError) return this.transient(claim, error, false);

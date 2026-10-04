@@ -9,7 +9,16 @@ const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 async function fixture(name: string) { return readFile(join(fixtures, name), 'utf8'); }
 test('RDGen provider turns the recorded start HTML into normalized metadata and manifest', async () => {
   const provider = new RdgenProvider({ fetch: async () => new Response(await fixture('rdgen-start.html'), { status: 200 }) });
-  const remote = await provider.startBuild({ version: '1', platform: 'windows', exename: 'acme', appname: 'Acme', serverIP: 'x', key: 'k', permanentPassword: 'secret', logoStorageKey: 'logos/x.png', custom: {} });
+  const remote = await provider.startBuild({
+    version: '1', platform: 'windows', exename: 'acme', appname: 'Acme', serverIP: 'x', key: 'k', permanentPassword: 'secret',
+    direction: 'incoming', installation: 'installationY', settings: 'settingsY', passApproveMode: 'password-click',
+    theme: 'system', themeDorO: 'default', permissionsDorO: 'override', permissionsType: 'custom',
+    enableKeyboard: true, enableClipboard: true, enableFileTransfer: true, enableAudio: true, enableTCP: true,
+    enableRemoteRestart: true, enableRecording: true, enableBlockingInput: true, enableRemoteModi: true,
+    enablePrinter: true, enableCamera: true, enableTerminal: true,
+    denyLan: false, enableDirectIP: true, autoClose: false, hidecm: false, xOffline: false,
+    removeNewVersionNotif: true, removeWallpaper: false, logoStorageKey: 'logos/x.png'
+  });
   assert.equal(remote.uuid, '11111111-1111-4111-8111-111111111111');
   assert.equal(remote.statusUrl.includes('/check_for_file?'), true);
   const manifest = provider.getDownloadManifest(remote);
