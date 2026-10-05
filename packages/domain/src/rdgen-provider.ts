@@ -7,6 +7,8 @@ export type RemoteBuildStatus = { stage: 'pending' | 'succeeded' | 'failed'; tex
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export class RdgenProtocolError extends Error {}
+/** RDGen answered 404: it lost track of the run; the GitHub Actions run is the remaining source of truth. */
+export class RdgenRunUnknownError extends Error {}
 export class RdgenTransientError extends Error {}
 /** The provider definitely rejected the request; a new remote build was not started. */
 export class RdgenTerminalError extends Error {}
@@ -27,12 +29,14 @@ function decodeQuery(html: string): URLSearchParams {
 function textStatus(html: string): string {
   const status = /<span\s+id=["']statusText["'][^>]*>([\s\S]*?)<\/span>/i.exec(html);
   if (status) return status[1].replace(/<[^>]+>/g, '').trim();
+  const success = /<h[1-6]\b[^>]*\bclass=["'][^"']*\bsuccess-text\b[^"']*["'][^>]*>([\s\S]*?)<\/h[1-6]>/i.exec(html);
+  if (success) return success[1].replace(/<[^>]+>/g, '').trim();
   const interruption = /<h[1-6]\b[^>]*\bclass=["'][^"']*\berror-header\b[^"']*["'][^>]*>([\s\S]*?)<\/h[1-6]>/i.exec(html);
   if (interruption) return interruption[1].replace(/<[^>]+>/g, '').trim();
-  throw new RdgenProtocolError('RDGen protocol changed: statusText is missing');
+  throw new RdgenProtocolError('RDGen protocol changed: no recognizable status template');
 }
 function action(html: string, base: string): string | undefined {
-  const match = /<a\b[^>]*href=["']([^"']+)["'][^>]*>[^<]*(?:Actions|GitHub)[^<]*<\/a>/i.exec(html);
+  const match = /<a\b[^>]*href=["']([^"']+)["'][^>]*>(?:(?!<\/a>)[\s\S])*(?:Actions|GitHub)(?:(?!<\/a>)[\s\S])*<\/a>/i.exec(html);
   if (!match) return undefined;
   const url = new URL(match[1], base);
   if (url.protocol !== 'https:' || url.hostname !== 'github.com') throw new RdgenProtocolError('RDGen returned an off-allowlist Actions URL');
@@ -77,6 +81,7 @@ export class RdgenProvider {
     try { response = await this.fetch(absolute(this.baseUrl, remote.statusUrl), { redirect: 'error' }); }
     catch { throw new RdgenTransientError('RDGen status request failed'); }
     if (response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500) throw new RdgenTransientError(`RDGen status returned HTTP ${response.status}`);
+    if (response.status === 404) throw new RdgenRunUnknownError('RDGen has no record of this remote build');
     if (!response.ok) throw new RdgenProtocolError(`RDGen status rejected with HTTP ${response.status}`);
     const html = await response.text(); const text = textStatus(html); const actionUrl = action(html, this.baseUrl) ?? remote.actionUrl;
     const lowered = text.toLowerCase();

@@ -3,14 +3,16 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Queue } from 'bullmq';
 import type { Pool, PoolClient } from 'pg';
-import { classifyWorkflowFailure, EncryptionService, RdgenAmbiguousStartError, RdgenProvider, RdgenTerminalError, RdgenTransientError, retryDelayMs, sweepTemporaryConfigurations, type DownloadManifest, type ProtectedValue, type RemoteBuild, type ResolvedJobConfiguration } from '@rdgen/domain';
+import { canonicalActionRunUrl, classifyWorkflowFailure, EncryptionService, extractActionRunId, RdgenAmbiguousStartError, RdgenProvider, RdgenRunUnknownError, RdgenTerminalError, RdgenTransientError, retryDelayMs, sweepTemporaryConfigurations, type DownloadManifest, type ProtectedValue, type RemoteBuild, type ResolvedJobConfiguration } from '@rdgen/domain';
 import { ActionTelemetryStore } from './action-telemetry-store.js';
 import { ArtifactDelivery } from './artifact-delivery.js';
 
 const MAX_RETRIES = 3;
 const WORKFLOW_RETRY_LIMIT = 3;
+/** ~1h of 15s polls with neither RDGen nor GitHub reachable before a build is declared indeterminate. */
+const UNKNOWN_REMOTE_LIMIT = 240;
 type ClaimedStart = { kind: 'start'; jobId: string; attemptId: string; attemptNumber: number; configuration: ResolvedJobConfiguration };
-type ClaimedPoll = { kind: 'poll'; jobId: string; attemptId: string; remote: RemoteBuild; actionUrl?: string; pollFailures: number };
+type ClaimedPoll = { kind: 'poll'; jobId: string; attemptId: string; remote: RemoteBuild; actionUrl?: string; pollFailures: number; unknownMisses: number };
 type Claim = ClaimedStart | ClaimedPoll;
 type EncryptedColumns = { ciphertext: string | null; integrity: string | null; keyId: string | null };
 function protectedValue(row: EncryptedColumns): ProtectedValue | undefined {
@@ -94,7 +96,7 @@ export class RdgenJobRunner {
         const metadata = protectedValue(attempt); if (!metadata) throw new Error('Active RDGen attempt is missing protected metadata');
         const remote = JSON.parse(this.encryption.decrypt(metadata).toString('utf8')) as RemoteBuild;
         await client.query(`UPDATE build_jobs SET status = 'aguardando_rdgen', updated_at = now() WHERE id = $1`, [jobId]);
-        await client.query('COMMIT'); return { kind: 'poll', jobId, attemptId: attempt.id, remote, ...(remote.actionUrl ? { actionUrl: remote.actionUrl } : {}), pollFailures: Number(/^poll:(\d+)$/.exec(attempt.errorCode ?? '')?.[1] ?? 0) };
+        await client.query('COMMIT'); return { kind: 'poll', jobId, attemptId: attempt.id, remote, ...(remote.actionUrl ? { actionUrl: remote.actionUrl } : {}), pollFailures: Number(/^poll:(\d+)$/.exec(attempt.errorCode ?? '')?.[1] ?? 0), unknownMisses: Number(/^unknown:(\d+)$/.exec(attempt.errorCode ?? '')?.[1] ?? 0) };
       }
       const config = protectedValue(job);
       if (!['enfileirado', 'aguardando_retry'].includes(job.status) || !config) { await client.query('COMMIT'); return undefined; }
@@ -133,54 +135,97 @@ export class RdgenJobRunner {
       const status = await this.provider.getBuildStatus(claim.remote);
       if (status.stage === 'pending') return this.schedulePoll(claim, status.text, status.actionUrl);
       if (status.stage === 'succeeded') return this.download(claim, status.text, status.manifest, status.actionUrl);
-      const telemetryRow = await this.actionStore?.refresh(status.actionUrl ?? claim.actionUrl);
-      const telemetry = telemetryRow ? ActionTelemetryStore.telemetry(telemetryRow) : undefined;
-      const classification = classifyWorkflowFailure({ rdgenFailed: true, snapshot: ActionTelemetryStore.decisionSnapshot(telemetryRow) });
-      const client = await this.pool.connect();
-      try {
-        await client.query('BEGIN');
-        await client.query(
-          `UPDATE build_attempts SET active = false, status = 'falhou', error_code = $2, remote_stage = $3, ended_at = now(), last_polled_at = now(), action_telemetry = $4::jsonb WHERE id = $1 AND active`,
-          [claim.attemptId, classification.retryable ? 'workflow_infrastructure' : null, status.text, telemetry ? JSON.stringify(telemetry) : null]
-        );
-        if (classification.retryable) {
-          const counted = await client.query<{ count: number }>(
-            `UPDATE build_jobs SET consecutive_workflow_infrastructure_failures = consecutive_workflow_infrastructure_failures + 1, updated_at = now()
-             WHERE id = $1 AND status = 'aguardando_rdgen' RETURNING consecutive_workflow_infrastructure_failures AS count`, [claim.jobId]);
-          if (counted.rowCount && counted.rows[0].count >= WORKFLOW_RETRY_LIMIT) {
-            await client.query(`UPDATE build_jobs SET status = 'falhou', lease_owner = NULL, lease_expires_at = NULL, last_error_code = 'workflow_retry_exhausted', updated_at = now() WHERE id = $1 AND status = 'aguardando_rdgen'`, [claim.jobId]);
-          } else if (counted.rowCount) {
-            const delay = retryDelayMs(counted.rows[0].count);
-            await client.query(`UPDATE build_jobs SET status = 'aguardando_retry', next_retry_at = now() + ($2 * interval '1 millisecond'), lease_owner = NULL, lease_expires_at = NULL, last_error_code = 'workflow_infrastructure', updated_at = now() WHERE id = $1 AND status = 'aguardando_rdgen'`, [claim.jobId, delay]);
-            await this.enqueue(client, claim.jobId, 'dispatch', delay);
-          }
-        } else {
-          await client.query(`UPDATE build_jobs SET status = 'falhou', lease_owner = NULL, lease_expires_at = NULL, consecutive_workflow_infrastructure_failures = 0, updated_at = now() WHERE id = $1 AND status = 'aguardando_rdgen'`, [claim.jobId]);
-        }
-        await client.query('COMMIT');
-      } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
+      return this.remoteFailed(claim, status.text, status.actionUrl ?? claim.actionUrl);
     } catch (error) {
+      if (error instanceof RdgenRunUnknownError) return this.unknownRemote(claim);
       if (error instanceof RdgenTransientError) return this.transient({ ...claim, attemptNumber: claim.pollFailures + 1 }, error, true);
       return this.finishPollFailure(claim, error instanceof Error ? error : new Error('RDGen status parse failure'));
     }
   }
-  private async download(claim: ClaimedPoll, text: string, manifest: DownloadManifest | undefined, actionUrl?: string): Promise<void> {
-    if (!manifest || !this.artifacts) return this.finishArtifactFailure(claim);
+  private async remoteFailed(claim: ClaimedPoll, text: string, actionUrl?: string): Promise<void> {
+    const telemetryRow = await this.actionStore?.refresh(actionUrl);
+    const telemetry = telemetryRow ? ActionTelemetryStore.telemetry(telemetryRow) : undefined;
+    const classification = classifyWorkflowFailure({ rdgenFailed: true, snapshot: ActionTelemetryStore.decisionSnapshot(telemetryRow) });
+    // A failed workflow still uploads every artifact it managed to build; a partial Linux matrix must not discard the good ones.
+    if (!classification.retryable) return this.download(claim, text, this.provider.getDownloadManifest(claim.remote), actionUrl, true);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE build_attempts SET active = false, status = 'falhou', error_code = 'workflow_infrastructure', remote_stage = $2, ended_at = now(), last_polled_at = now(), action_telemetry = $3::jsonb WHERE id = $1 AND active`,
+        [claim.attemptId, text, telemetry ? JSON.stringify(telemetry) : null]
+      );
+      const counted = await client.query<{ count: number }>(
+        `UPDATE build_jobs SET consecutive_workflow_infrastructure_failures = consecutive_workflow_infrastructure_failures + 1, updated_at = now()
+         WHERE id = $1 AND status = 'aguardando_rdgen' RETURNING consecutive_workflow_infrastructure_failures AS count`, [claim.jobId]);
+      if (counted.rowCount && counted.rows[0].count >= WORKFLOW_RETRY_LIMIT) {
+        await client.query(`UPDATE build_jobs SET status = 'falhou', lease_owner = NULL, lease_expires_at = NULL, last_error_code = 'workflow_retry_exhausted', updated_at = now() WHERE id = $1 AND status = 'aguardando_rdgen'`, [claim.jobId]);
+      } else if (counted.rowCount) {
+        const delay = retryDelayMs(counted.rows[0].count);
+        await client.query(`UPDATE build_jobs SET status = 'aguardando_retry', next_retry_at = now() + ($2 * interval '1 millisecond'), lease_owner = NULL, lease_expires_at = NULL, last_error_code = 'workflow_infrastructure', updated_at = now() WHERE id = $1 AND status = 'aguardando_rdgen'`, [claim.jobId, delay]);
+        await this.enqueue(client, claim.jobId, 'dispatch', delay);
+      }
+      await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
+  }
+  /** RDGen lost the run record (404). The GitHub Actions run is the remaining source of truth before declaring anything. */
+  private async unknownRemote(claim: ClaimedPoll): Promise<void> {
+    const actionUrl = claim.actionUrl ?? claim.remote.actionUrl;
+    const runId = extractActionRunId(actionUrl);
+    if (runId) {
+      const row = await this.actionStore?.refresh(canonicalActionRunUrl(runId));
+      const snapshot = row && row.fetchError === null ? row.snapshot : undefined;
+      if (snapshot && snapshot.status) {
+        if (snapshot.status !== 'completed') return this.schedulePoll(claim, `GitHub Actions: ${snapshot.status}`, actionUrl);
+        if (snapshot.conclusion === 'success') return this.download(claim, 'Concluído (confirmado no GitHub Actions)', this.provider.getDownloadManifest(claim.remote), actionUrl);
+        return this.remoteFailed(claim, `Falha confirmada no GitHub Actions: ${snapshot.conclusion ?? 'desconhecida'}`, actionUrl);
+      }
+    }
+    const misses = claim.unknownMisses + 1;
+    if (misses >= UNKNOWN_REMOTE_LIMIT) {
+      await this.pool.query(`UPDATE build_attempts SET active = false, status = 'falhou', error_code = 'remote_status_unknown', ended_at = now(), last_polled_at = now() WHERE id = $1 AND active`, [claim.attemptId]);
+      await this.pool.query(`UPDATE build_jobs SET status = 'início_indeterminado', lease_owner = NULL, lease_expires_at = NULL, last_error_code = 'remote_status_unknown', updated_at = now() WHERE id = $1`, [claim.jobId]);
+      return;
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`UPDATE build_attempts SET error_code = $2, remote_stage = 'status remoto indisponível', last_polled_at = now() WHERE id = $1 AND active`, [claim.attemptId, `unknown:${misses}`]);
+      await client.query(`UPDATE build_jobs SET lease_owner = NULL, lease_expires_at = NULL, updated_at = now() WHERE id = $1`, [claim.jobId]);
+      await this.enqueue(client, claim.jobId, 'poll', this.pollDelayMs);
+      await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
+  }
+  private async download(claim: ClaimedPoll, text: string, manifest: DownloadManifest | undefined, actionUrl?: string, salvaged = false): Promise<void> {
+    if (!manifest || !this.artifacts) {
+      if (salvaged) return this.markFailed(claim, text, actionUrl);
+      return this.finishArtifactFailure(claim);
+    }
     const claimed = await this.pool.query(`UPDATE build_jobs SET status = 'baixando', updated_at = now() WHERE id = $1 AND status = 'aguardando_rdgen' AND lease_owner = $2 RETURNING id`, [claim.jobId, this.owner]);
     if (!claimed.rowCount) return;
     let result: { valid: number; expected: number; partial: boolean };
     try { result = await this.artifacts.deliver(claim.jobId, claim.remote, manifest); }
-    catch { return this.finishArtifactFailure(claim); }
+    catch {
+      if (salvaged) return this.markFailed(claim, text, actionUrl);
+      return this.finishArtifactFailure(claim);
+    }
     const telemetryRow = await this.actionStore?.refresh(actionUrl ?? claim.actionUrl);
     const telemetry = telemetryRow ? ActionTelemetryStore.telemetry(telemetryRow) : undefined;
-    const state = result.valid === result.expected ? 'concluído' : result.partial ? 'concluído_parcial' : 'falhou';
+    const state = result.valid === result.expected ? 'concluído' : result.valid > 0 ? 'concluído_parcial' : 'falhou';
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(`UPDATE build_attempts SET active = false, status = $2, remote_stage = $3, ended_at = now(), last_polled_at = now(), action_telemetry = $4::jsonb WHERE id = $1 AND active`, [claim.attemptId, state, text, telemetry ? JSON.stringify(telemetry) : null]);
-      await client.query(`UPDATE build_jobs SET status = $2, lease_owner = NULL, lease_expires_at = NULL, consecutive_workflow_infrastructure_failures = 0, last_error_code = CASE WHEN $2 = 'falhou' THEN 'artifact_validation' ELSE NULL END, updated_at = now() WHERE id = $1 AND status = 'baixando'`, [claim.jobId, state]);
+      await client.query(`UPDATE build_jobs SET status = $2, lease_owner = NULL, lease_expires_at = NULL, consecutive_workflow_infrastructure_failures = 0, last_error_code = CASE WHEN $2 = 'falhou' THEN $3 ELSE NULL END, updated_at = now() WHERE id = $1 AND status = 'baixando'`, [claim.jobId, state, salvaged ? null : 'artifact_validation']);
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }
+  }
+  /** A salvaged failure that produced no downloadable artifact is a plain build failure, not an artifact-validation problem. */
+  private async markFailed(claim: ClaimedPoll, text: string, actionUrl?: string): Promise<void> {
+    const telemetryRow = await this.actionStore?.refresh(actionUrl ?? claim.actionUrl);
+    const telemetry = telemetryRow ? ActionTelemetryStore.telemetry(telemetryRow) : undefined;
+    await this.pool.query(`UPDATE build_attempts SET active = false, status = 'falhou', remote_stage = $2, ended_at = now(), last_polled_at = now(), action_telemetry = $3::jsonb WHERE id = $1 AND active`, [claim.attemptId, text, telemetry ? JSON.stringify(telemetry) : null]);
+    await this.pool.query(`UPDATE build_jobs SET status = 'falhou', lease_owner = NULL, lease_expires_at = NULL, consecutive_workflow_infrastructure_failures = 0, updated_at = now() WHERE id = $1`, [claim.jobId]);
   }
   private async finishArtifactFailure(claim: ClaimedPoll): Promise<void> {
     await this.pool.query(`UPDATE build_attempts SET active = false, status = 'falhou', error_code = 'artifact_validation', ended_at = now() WHERE id = $1 AND active`, [claim.attemptId]);
@@ -228,7 +273,9 @@ export class RdgenJobRunner {
     void error;
   }
   private async finishPollFailure(claim: ClaimedPoll, error: Error): Promise<void> {
-    await this.pool.query(`UPDATE build_attempts SET active = false, status = 'falhou', error_code = 'remote_status_failure', ended_at = now() WHERE id = $1`, [claim.attemptId]);
+    const telemetryRow = await this.actionStore?.refresh(claim.actionUrl ?? claim.remote.actionUrl);
+    const telemetry = telemetryRow ? ActionTelemetryStore.telemetry(telemetryRow) : undefined;
+    await this.pool.query(`UPDATE build_attempts SET active = false, status = 'falhou', error_code = 'remote_status_failure', ended_at = now(), action_telemetry = $2::jsonb WHERE id = $1`, [claim.attemptId, telemetry ? JSON.stringify(telemetry) : null]);
     await this.pool.query(`UPDATE build_jobs SET status = 'falhou', lease_owner = NULL, lease_expires_at = NULL, consecutive_workflow_infrastructure_failures = 0, last_error_code = 'remote_status_failure', updated_at = now() WHERE id = $1`, [claim.jobId]); void error;
   }
   private async schedulePoll(claim: ClaimedPoll, text: string, actionUrl?: string): Promise<void> {
@@ -240,8 +287,8 @@ export class RdgenJobRunner {
       if (actionUrl) {
         const protectedValue = this.encryption.encrypt(JSON.stringify({ ...claim.remote, actionUrl }));
         const record = await client.query<{ id: string }>(`INSERT INTO protected_records (purpose, ciphertext, integrity, key_id) VALUES ('rdgen-remote-links', $1, $2, $3) RETURNING id`, [protectedValue.ciphertext, protectedValue.integrity, protectedValue.keyId]);
-        await client.query(`UPDATE build_attempts SET remote_metadata_protected_id = $2, remote_stage = $3, last_polled_at = now(), action_telemetry = $4::jsonb WHERE id = $1 AND active`, [claim.attemptId, record.rows[0].id, text, telemetry ? JSON.stringify(telemetry) : null]);
-      } else await client.query(`UPDATE build_attempts SET remote_stage = $2, last_polled_at = now(), action_telemetry = $3::jsonb WHERE id = $1 AND active`, [claim.attemptId, text, telemetry ? JSON.stringify(telemetry) : null]);
+        await client.query(`UPDATE build_attempts SET remote_metadata_protected_id = $2, remote_stage = $3, last_polled_at = now(), error_code = NULL, action_telemetry = $4::jsonb WHERE id = $1 AND active`, [claim.attemptId, record.rows[0].id, text, telemetry ? JSON.stringify(telemetry) : null]);
+      } else await client.query(`UPDATE build_attempts SET remote_stage = $2, last_polled_at = now(), error_code = NULL, action_telemetry = $3::jsonb WHERE id = $1 AND active`, [claim.attemptId, text, telemetry ? JSON.stringify(telemetry) : null]);
       await client.query(`UPDATE build_jobs SET lease_owner = NULL, lease_expires_at = NULL, updated_at = now() WHERE id = $1`, [claim.jobId]);
       await this.enqueue(client, claim.jobId, 'poll', this.pollDelayMs); await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; } finally { client.release(); }

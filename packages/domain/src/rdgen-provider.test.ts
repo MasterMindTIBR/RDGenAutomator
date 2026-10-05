@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { RdgenAmbiguousStartError, RdgenProvider, RdgenProtocolError, RdgenTerminalError } from './rdgen-provider.js';
+import { RdgenAmbiguousStartError, RdgenProvider, RdgenProtocolError, RdgenRunUnknownError, RdgenTerminalError } from './rdgen-provider.js';
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 async function fixture(name: string) { return readFile(join(fixtures, name), 'utf8'); }
@@ -34,10 +34,19 @@ test('RDGen provider keeps an explicit start rejection terminal', async () => {
   const provider = new RdgenProvider({ fetch: async () => new Response('invalid configuration', { status: 400 }) });
   await assert.rejects(() => provider.startBuild({} as never), RdgenTerminalError);
 });
-test('RDGen status parser keeps Actions links out of callers HTML concerns', async () => {
+test('RDGen status parser reads the real success page, which has no statusText span nor Actions link', async () => {
   const provider = new RdgenProvider({ fetch: async () => new Response(await fixture('rdgen-success.html'), { status: 200 }) });
   const status = await provider.getBuildStatus({ uuid: '11111111-1111-4111-8111-111111111111', filename: 'acme', platform: 'windows', statusUrl: 'https://rdgen.crayoneater.org/check_for_file?filename=acme&uuid=11111111-1111-4111-8111-111111111111&platform=windows' });
-  assert.equal(status.stage, 'succeeded'); assert.equal(status.actionUrl, 'https://github.com/example/rdgen/actions/runs/42'); assert.equal(status.manifest?.artifacts.length, 2);
+  assert.equal(status.stage, 'succeeded'); assert.equal(status.actionUrl, undefined); assert.equal(status.manifest?.artifacts.length, 2);
+});
+test('RDGen status parser keeps polling the waiting page and extracts the Actions link despite nested markup', async () => {
+  const provider = new RdgenProvider({ fetch: async () => new Response(await fixture('rdgen-pending.html'), { status: 200 }) });
+  const status = await provider.getBuildStatus({ uuid: '11111111-1111-4111-8111-111111111111', filename: 'acme', platform: 'windows', statusUrl: 'https://rdgen.crayoneater.org/check_for_file?filename=acme&uuid=11111111-1111-4111-8111-111111111111&platform=windows' });
+  assert.equal(status.stage, 'pending'); assert.equal(status.text, 'in_progress'); assert.equal(status.actionUrl, 'https://github.com/bryangerlach/rdgen/actions/runs/37219299194');
+});
+test('RDGen status parser maps a lost run record to a dedicated error, never to a failed build', async () => {
+  const provider = new RdgenProvider({ fetch: async () => new Response('<html>404</html>', { status: 404 }) });
+  await assert.rejects(() => provider.getBuildStatus({ uuid: '11111111-1111-4111-8111-111111111111', filename: 'acme', platform: 'windows', statusUrl: 'https://rdgen.crayoneater.org/check_for_file?filename=acme&uuid=11111111-1111-4111-8111-111111111111&platform=windows' }), RdgenRunUnknownError);
 });
 test('RDGen status parser reports the live interruption response as a failed build', async () => {
   const provider = new RdgenProvider({ fetch: async () => new Response('<h2 class="error-header">Workflow Interrupted</h2><a href="https://github.com/bryangerlach/rdgen/actions/runs/37219299194">Check GitHub Logs for error details ↗</a>', { status: 200 }) });

@@ -14,7 +14,7 @@ export function expectedArtifactFilenames(filename: string, platform: Platform):
   if (platform === 'windows-x86') return [`${filename}.exe`];
   if (platform === 'macos') return [`${filename}-x86_64.dmg`, `${filename}-aarch64.dmg`];
   if (platform === 'android') return [`${filename}-aarch64.apk`, `${filename}-x86_64.apk`, `${filename}-armv7.apk`];
-  return [`${filename}-x86_64.deb`, `${filename}-x86_64.rpm`, `${filename}-suse-x86_64.rpm`, `${filename}-x86_64.pkg.tar.zst`, `${filename}-aarch64.deb`, `${filename}-aarch64.rpm`, `${filename}-suse-aarch64.rpm`, `${filename}-suse-aarch64.pkg.tar.zst`, `${filename}-x86_64.AppImage`, `${filename}-aarch64.AppImage`, `${filename}-x86_64.flatpak`, `${filename}-aarch64.flatpak`];
+  return [`${filename}-x86_64.deb`, `${filename}-x86_64.rpm`, `${filename}-suse-x86_64.rpm`, `${filename}-x86_64.pkg.tar.zst`, `${filename}-aarch64.deb`, `${filename}-aarch64.rpm`, `${filename}-suse-aarch64.rpm`, `${filename}-aarch64.pkg.tar.zst`, `${filename}-x86_64.AppImage`, `${filename}-aarch64.AppImage`, `${filename}-x86_64.flatpak`, `${filename}-aarch64.flatpak`];
 }
 
 /** Rejects anything that was not constructed by the normalized provider contract. */

@@ -101,16 +101,16 @@ async function main(): Promise<void> {
     await connection.ping();
     queue = new Queue('rdgen-builds-smoke', { connection });
     const provider = new RdgenProvider({ fetch: async (url, init) => {
-      const body = String(init?.body ?? '');
-      if (init?.method === 'POST' && body.includes('exename=indeterminate')) throw new TypeError('fixture lost response after send');
+      const exename = init?.body instanceof FormData ? String(init.body.get('exename') ?? '') : '';
+      if (init?.method === 'POST' && exename === 'indeterminate') throw new TypeError('fixture lost response after send');
       if (String(url).includes('/download?')) {
         if (String(url).includes('filename=partial.msi')) return new Response(Buffer.from('<html>error</html>'.padEnd(96)), { status: 200, headers: { 'content-type': 'text/html' } });
         const binary = String(url).includes('.msi') ? Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), Buffer.alloc(90)]) : Buffer.concat([Buffer.from([0x4d, 0x5a]), Buffer.alloc(96)]);
         return new Response(binary, { status: 200, headers: { 'content-type': 'application/octet-stream', 'content-length': String(binary.byteLength) } });
       }
-      return new Response(init?.method === 'POST' ? (body.includes('exename=partial') ? started.replaceAll('acme-support', 'partial') : started) : succeeded, { status: 200 });
+      return new Response(init?.method === 'POST' ? (exename === 'partial' ? started.replaceAll('acme-support', 'partial') : started) : succeeded, { status: 200 });
     } });
-    const runner = new RdgenJobRunner(pool, queue, encryption, provider, 100, environment.APP_STORAGE_PATH);
+    const runner = new RdgenJobRunner(pool, queue, encryption, provider, 100, 0, undefined, environment.APP_STORAGE_PATH);
     worker = new Worker('rdgen-builds-smoke', async (job) => runner.run(String(job.data.jobId)), { connection, concurrency: 1 });
     const dispatcher = new OutboxDispatcher(pool, queue);
     await Promise.all([queue.waitUntilReady(), worker.waitUntilReady()]);

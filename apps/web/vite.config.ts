@@ -20,6 +20,13 @@ export default defineConfig(({ command }) => ({
     tailwindcss(),
     tsconfigPaths(),
     // nitro builds the deployable server bundle; the dev server runs on Vite directly.
-    command === "build" && nitro({ preset: "node-server" }),
+    command === "build" && nitro({
+      preset: "node-server",
+      routeRules: {
+        // HTML must always be revalidated so browsers never pin a stale hashed bundle; assets stay immutable by content hash.
+        "/**": { headers: { "cache-control": "no-cache" } },
+        "/assets/**": { headers: { "cache-control": "public, max-age=31536000, immutable" } },
+      },
+    }),
   ],
 }));
