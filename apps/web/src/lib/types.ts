@@ -19,7 +19,7 @@ export type Attempt = { id: string; number: number; status: JobStatus; stage?: s
 export type ActionTelemetry = { source: string; observedAt: string; stale: boolean; fetchError: string | null; complete: boolean; status: 'queued' | 'in_progress' | 'completed' | null; conclusion: 'success' | 'failure' | 'cancelled' | null; step: string | null; percentage: number | null };
 export type CloneDraft = { token: string; sourceRequestId: string; serverId: string; brandingId: string | null; companyId: string | null; presets: Partial<Record<Profile, string>>; profiles: Profile[]; platforms: Platform[]; version: string; displayName: string; technicalName: string; images: Partial<Record<'icon' | 'logo' | 'privacy', string>>; missing: { icon: boolean; logo: boolean; privacy: boolean } };
 export type Job = { id: string; profile: Profile; platform: Platform; version: string; status: JobStatus; manualRetryAfter?: string | null; lastErrorCode?: string | null; cancellationRemoteMayContinue?: boolean; createdAt: string; updatedAt: string; attempts: Attempt[]; requestId?: string };
-export type Artifact = { id: string; sha256: string; bytes: number; contentType: string; createdAt: string };
+export type Artifact = { id: string; jobId: string; filename: string | null; sha256: string; bytes: number; contentType: string; createdAt: string };
 
 export const platforms: Platform[] = ['windows', 'windows-x86', 'linux', 'android', 'macos'];
 export const platformLabel: Record<Platform, string> = { windows: 'Windows', 'windows-x86': 'Windows x86', linux: 'Linux', android: 'Android', macos: 'macOS' };
