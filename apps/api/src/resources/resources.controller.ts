@@ -89,7 +89,7 @@ export class ResourcesController {
         COALESCE((SELECT json_agg(json_build_object('id', a.id, 'number', a.attempt_number, 'status', a.status, 'stage', a.remote_stage, 'errorCode', a.error_code, 'riskConfirmedAt', a.risk_confirmed_at, 'actionTelemetry', a.action_telemetry, 'createdAt', a.created_at, 'updatedAt', a.updated_at) ORDER BY a.attempt_number DESC)
                   FROM build_attempts a WHERE a.job_id = j.id), '[]'::json) AS attempts
         FROM build_jobs j WHERE j.request_id = $1 ORDER BY j.created_at`, [id]),
-      this.pool.query(`SELECT a.id, a.filename, a.sha256, a.bytes, a.content_type AS "contentType", a.created_at AS "createdAt" FROM artifacts a JOIN build_jobs j ON j.id = a.job_id WHERE j.request_id = $1 ORDER BY a.created_at`, [id])
+      this.pool.query(`SELECT a.id, a.job_id AS "jobId", a.filename, a.sha256, a.bytes, a.content_type AS "contentType", a.created_at AS "createdAt" FROM artifacts a JOIN build_jobs j ON j.id = a.job_id WHERE j.request_id = $1 ORDER BY a.created_at`, [id])
     ]);
     return { request: { id: resource.id, visibility: resource.visibility, displayName: resource.displayName, technicalName: resource.technicalName, companyId: resource.companyId, createdAt: resource.createdAt, updatedAt: resource.updatedAt, canManage: actor.role === 'administrator' || resource.creatorId === actor.userId }, jobs: jobs.rows, artifacts: artifacts.rows };
   }
