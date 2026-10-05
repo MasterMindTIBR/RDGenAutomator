@@ -230,7 +230,27 @@ input:not([type=checkbox]):not([type=file]),select,textarea {background:var(--pa
 .public-wrap{min-height:100vh;padding:60px 16px;background:radial-gradient(circle at 55% 0%,color-mix(in oklch,var(--panel-raised) 55%,var(--background)),var(--background) 66%)}.public-content{width:min(100% - 32px,760px);margin:0 auto}.public-head{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:40px}.public-head p{color:var(--muted-foreground);margin-top:10px;max-width:480px}.public-company-list{display:grid;gap:11px}.public-company-row{display:flex;align-items:center;gap:15px;padding:19px 21px;border:1px solid var(--border);background:var(--panel);text-decoration:none;color:inherit;transition:.15s ease}.public-company-row:hover{border-color:var(--primary)}.public-company-row img{width:40px;height:40px;object-fit:contain;flex:none}.public-company-row strong{font-size:14px;display:block}.public-back{margin-bottom:24px;color:var(--muted-foreground);font-size:12px}.public-back a{display:inline-flex;align-items:center;gap:8px}.public-back a:hover{color:var(--primary)}
 .native-check{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:12px;color:var(--foreground);line-height:1.2}.native-check input[type=checkbox]{position:absolute;opacity:0;width:0;height:0}.native-check-box{width:18px;height:18px;flex:none;border:1px solid var(--border);border-radius:4px;background:var(--panel);display:inline-flex;align-items:center;justify-content:center;color:transparent;transition:background .12s,border-color .12s,color .12s}.native-check input:checked+.native-check-box{background:var(--primary);border-color:var(--primary);color:var(--primary-foreground)}.native-check input:focus-visible+.native-check-box{box-shadow:0 0 0 2px color-mix(in oklch,var(--primary) 30%,transparent)}.native-check input:disabled+.native-check-box{opacity:.4}.native-check.native-check-disabled{cursor:not-allowed;opacity:.6}.native-check-label{display:inline-flex;align-items:center;gap:6px}.form-stack .native-check,.toggle-grid .native-check{align-self:flex-start}
 
-/* Job cards render as a grid of tiles, one card per platform. */
-.jobs-list{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
-.job-body{grid-template-columns:1fr}
+/* Job cards render as a compact grid of tiles, one card per platform. */
+.jobs-list{grid-template-columns:repeat(auto-fill,minmax(270px,320px))}
+.job-top{padding:12px 14px}
+.job-body{grid-template-columns:1fr;gap:12px;padding:12px 14px}
+.job-footer{padding:7px 10px}
+.job-footer{flex-wrap:wrap}
+.job-icon{width:32px;height:32px;font-size:13px}
+.job-title-line h3{font-size:14px}
+.job-title small{margin-top:2px;font-size:10px}
+.job-meta{gap:18px}
+.job-meta strong{font-size:11px}
+.artifacts{padding:11px 14px}
+.artifact{padding:7px 0}
+/* GitHub telemetry block. */
+.telemetry-zone{display:grid;gap:7px}
+.telemetry-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.telemetry-bar{height:5px;border-radius:99px;background:var(--border);overflow:hidden}
+.telemetry-bar .progress-fill{height:100%;background:var(--primary);border-radius:99px;transition:width .4s ease}
+.telemetry-meta{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:11px;color:var(--muted-foreground)}
+.telemetry-meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.telemetry-meta strong{font-size:11px;color:var(--foreground);flex:none}
+.stale-badge{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-foreground);border:1px solid var(--border);border-radius:99px;padding:2px 7px;white-space:nowrap}
+.progress-info p{margin:5px 0 0;font-size:12px}
 
