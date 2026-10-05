@@ -253,4 +253,8 @@ input:not([type=checkbox]):not([type=file]),select,textarea {background:var(--pa
 .telemetry-meta strong{font-size:11px;color:var(--foreground);flex:none}
 .stale-badge{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-foreground);border:1px solid var(--border);border-radius:99px;padding:2px 7px;white-space:nowrap}
 .progress-info p{margin:5px 0 0;font-size:12px}
+/* Artifact rows: full filename wraps; size only, no hash. */
+.artifact{padding:8px 0;gap:10px}
+.artifact strong{font-size:12px;line-height:1.35;white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word}
+.artifact small{font-size:10px}
 
