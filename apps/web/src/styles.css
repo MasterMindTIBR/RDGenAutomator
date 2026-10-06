@@ -257,4 +257,7 @@ input:not([type=checkbox]):not([type=file]),select,textarea {background:var(--pa
 .artifact{padding:8px 0;gap:10px}
 .artifact strong{font-size:12px;line-height:1.35;white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word}
 .artifact small{font-size:10px}
+/* Cards keep their own height; one expanded card never stretches its row siblings. */
+.jobs-list{align-items:start}
+.updated-short{display:inline-flex;align-items:center;gap:4px;font-weight:400;color:var(--muted-foreground)}
 
