@@ -11,11 +11,12 @@ import { Empty, Page, SectionHeading } from './shared';
 type ExecutionArtifact = { id: string; filename: string | null; bytes: string };
 type Execution = { profile: string; platform: string; status: string; artifacts: ExecutionArtifact[] };
 
-/** The one file an end user should install, per platform; anything else becomes a secondary link. */
-const primaryPattern: Record<string, RegExp> = { windows: /\.exe$/, 'windows-x86': /\.exe$/, macos: /aarch64\.dmg$/, android: /aarch64\.apk$/, linux: /x86_64\.deb$/ };
-function primaryOf(platform: string, artifacts: ExecutionArtifact[]): ExecutionArtifact | undefined {
-  const pattern = primaryPattern[platform];
-  return (pattern ? artifacts.find((artifact) => pattern.test(artifact.filename ?? '')) : undefined) ?? artifacts[0];
+/** Short discriminator stamped on each button: EXE, x64 DEB, ARM64 DMG, ... */
+function variantLabel(filename: string): string {
+  const stem = filename.replace(/\.[^.]+$/, '');
+  const arch = /x86_64/.test(stem) ? 'x64' : /aarch64/.test(stem) ? 'ARM64' : /armv7/.test(stem) ? 'ARM' : '';
+  const ext = filename.slice(filename.lastIndexOf('.') + 1).toUpperCase();
+  return arch ? `${arch} ${ext}` : ext;
 }
 
 function WindowsGlyph() { return <svg viewBox="0 0 24 24" aria-hidden><path fill="#0078D4" d="M3 5.4 10.4 4.4v6.9H3zM11.4 4.2 21 3v8.3h-9.6zM3 12.3h7.4v6.9L3 18.2zM11.4 12.3H21v8.3l-9.6-1.2z" /></svg>; }
@@ -43,15 +44,13 @@ export function CompanyDetail() {
         <div className="download-logo"><Glyph /></div>
         <h3>{platformLabel[platform]}</h3>
         <div className="download-actions">
-          {(['full', 'qs'] as const).map((profile) => {
+          {(['full', 'qs'] as const).flatMap((profile) => {
             const execution = latest.get(`${platform}:${profile}`);
-            const primary = execution ? primaryOf(platform, execution.artifacts) : undefined;
-            return primary
-              ? <Button key={profile} variant="outline" size="sm" asChild><a href={repository.downloadUrl(primary.id)} title={`${primary.filename} · ${artifactBytes(Number(primary.bytes))}`}><Download size={15} /> {profile === 'full' ? 'Full' : 'QS'}</a></Button>
-              : <Button key={profile} variant="outline" size="sm" disabled title="Sem build concluído">— {profile === 'full' ? 'Full' : 'QS'}</Button>;
+            const artifacts = execution?.artifacts ?? [];
+            if (artifacts.length === 0) return <Button key={profile} variant="outline" size="sm" disabled title="Sem build concluído">— {profile === 'full' ? 'Full' : 'QS'}</Button>;
+            return artifacts.map((artifact) => <Button key={`${profile}-${artifact.id}`} variant="outline" size="sm" asChild><a href={repository.downloadUrl(artifact.id)} title={`${artifact.filename} · ${artifactBytes(Number(artifact.bytes))}`}><Download size={15} /> {profile === 'full' ? 'Full' : 'QS'} · {variantLabel(artifact.filename ?? '')}</a></Button>);
           })}
         </div>
-        {(['full', 'qs'] as const).flatMap((profile) => { const execution = latest.get(`${platform}:${profile}`); const primary = execution ? primaryOf(platform, execution.artifacts) : undefined; const extras = (execution?.artifacts ?? []).filter((artifact) => artifact.id !== primary?.id); return extras.map((artifact) => <a className="download-extra" key={artifact.id} href={repository.downloadUrl(artifact.id)}>{profile === 'full' ? 'Full' : 'QS'} · {artifact.filename} · {artifactBytes(Number(artifact.bytes))}</a>); })}
       </article>;})}
   </div></Page>;
 }
