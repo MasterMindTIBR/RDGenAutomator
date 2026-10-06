@@ -11,12 +11,21 @@ import { Empty, Page, SectionHeading } from './shared';
 type ExecutionArtifact = { id: string; filename: string | null; bytes: string };
 type Execution = { profile: string; platform: string; status: string; artifacts: ExecutionArtifact[] };
 
-/** Short discriminator stamped on each button: EXE, x64 DEB, ARM64 DMG, ... */
-function variantLabel(filename: string): string {
-  const stem = filename.replace(/\.[^.]+$/, '');
-  const arch = /x86_64/.test(stem) ? 'x64' : /aarch64/.test(stem) ? 'ARM64' : /armv7/.test(stem) ? 'ARM' : '';
-  const ext = filename.slice(filename.lastIndexOf('.') + 1).toUpperCase();
-  return arch ? `${arch} ${ext}` : ext;
+/** Button label: just the executable kind. Arch-only when the build has a single format (macOS, Android). */
+function archRank(filename: string): number { return /x86_64/.test(filename) ? 0 : /aarch64/.test(filename) ? 1 : /armv7/.test(filename) ? 2 : 3; }
+function archOf(filename: string): string { return /x86_64/.test(filename) ? 'x64' : /aarch64/.test(filename) ? 'ARM64' : /armv7/.test(filename) ? 'ARM' : ''; }
+function extOf(filename: string): string { return filename.slice(filename.lastIndexOf('.') + 1).toUpperCase(); }
+function variantLabels(artifacts: ExecutionArtifact[]): string[] {
+  const exts = new Set(artifacts.map((artifact) => extOf(artifact.filename ?? '')));
+  return artifacts.map((artifact) => {
+    const file = artifact.filename ?? '';
+    const arch = archOf(file);
+    if (exts.size === 1) {
+      if (extOf(file) === 'DMG') return arch === 'ARM64' ? 'Silicon (arm64)' : arch === 'x64' ? 'Intel (x64)' : arch || 'DMG';
+      return arch || extOf(file);
+    }
+    return arch ? `${extOf(file)} ${arch}` : extOf(file);
+  });
 }
 
 function WindowsGlyph() { return <svg viewBox="0 0 24 24" aria-hidden><path fill="#0078D4" d="M3 5.4 10.4 4.4v6.9H3zM11.4 4.2 21 3v8.3h-9.6zM3 12.3h7.4v6.9L3 18.2zM11.4 12.3H21v8.3l-9.6-1.2z" /></svg>; }
@@ -43,14 +52,18 @@ export function CompanyDetail() {
       return <article className="download-tile" key={platform}>
         <div className="download-logo"><Glyph /></div>
         <h3>{platformLabel[platform]}</h3>
-        <div className="download-actions">
-          {(['full', 'qs'] as const).flatMap((profile) => {
-            const execution = latest.get(`${platform}:${profile}`);
-            const artifacts = execution?.artifacts ?? [];
-            if (artifacts.length === 0) return <Button key={profile} variant="outline" size="sm" disabled title="Sem build concluído">— {profile === 'full' ? 'Full' : 'QS'}</Button>;
-            return artifacts.map((artifact) => <Button key={`${profile}-${artifact.id}`} variant="outline" size="sm" asChild><a href={repository.downloadUrl(artifact.id)} title={`${artifact.filename} · ${artifactBytes(Number(artifact.bytes))}`}><Download size={15} /> {profile === 'full' ? 'Full' : 'QS'} · {variantLabel(artifact.filename ?? '')}</a></Button>);
-          })}
-        </div>
+        {(['full', 'qs'] as const).map((profile) => {
+          const artifacts = [...(latest.get(`${platform}:${profile}`)?.artifacts ?? [])].sort((a, b) => archRank(a.filename ?? '') - archRank(b.filename ?? ''));
+          const labels = variantLabels(artifacts);
+          return <div className="download-section" key={profile}>
+            <div className="download-section-label"><span>{profile === 'full' ? 'FULL' : 'QS'}</span></div>
+            <div className="download-actions">
+              {artifacts.length === 0
+                ? <small className="download-none">Sem build</small>
+                : artifacts.map((artifact, index) => <Button key={artifact.id} variant="outline" size="sm" asChild><a href={repository.downloadUrl(artifact.id)} title={`${artifact.filename} · ${artifactBytes(Number(artifact.bytes))}`}><Download size={15} /> {labels[index]}</a></Button>)}
+            </div>
+          </div>;
+        })}
       </article>;})}
   </div></Page>;
 }
