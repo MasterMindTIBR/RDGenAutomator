@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: rdgen_automator
       POSTGRES_USER: rdgen
@@ -16,6 +17,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
